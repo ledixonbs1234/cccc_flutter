@@ -189,36 +189,47 @@ class HomeController extends GetxController {
 
   Future<void> layDanhSach() async {
     try {
-      var data = await FirebaseManager().rootPath.child("listcccd").once();
-      totalCCCD.clear();
+      // Thiết lập listener cho dữ liệu trong Firebase
+      FirebaseManager().rootPath.child("listcccd").onValue.listen((event) {
+        Map<dynamic, dynamic> map =
+            event.snapshot.value as Map<dynamic, dynamic>;
 
-      Map<dynamic, dynamic> map = data.snapshot.value as Map<dynamic, dynamic>;
-      for (var json in map.entries) {
-        CCCDInfo cccdInfo = CCCDInfo("", "", "");
-        cccdInfo.Name = json.value['Name'];
-        cccdInfo.Id = json.value['Id'];
-        cccdInfo.NgaySinh = json.value['NgaySinh'];
-        cccdInfo.TimeStamp = json.value['TimeStamp'];
-        //   cccdInfo.fromJson(inMap.value);
+        // Tạo một danh sách tạm thời để lưu trữ các ID đã thấy
+        List<String> existingIds = totalCCCD.map((item) => item.Id).toList();
 
-        totalCCCD.add(cccdInfo);
-      }
-      //order by timestamp
-      totalCCCD.sort((a, b) => a.TimeStamp.compareTo(b.TimeStamp));
+        for (var json in map.entries) {
+          CCCDInfo cccdInfo = CCCDInfo("", "", "");
+          cccdInfo.Name = json.value['Name'];
+          cccdInfo.Id = json.value['Id'];
+          cccdInfo.NgaySinh = json.value['NgaySinh'];
+          cccdInfo.TimeStamp = json.value['TimeStamp'];
 
-// Cập nhật chỉ số và tên hiện tại
-      if (totalCCCD.isNotEmpty) {
-        indexCurrent.value = 0;
-        nameCurrent.value = totalCCCD[indexCurrent.value].Name;
-      } else {
-        indexCurrent.value = 0;
-        nameCurrent.value = "";
-      }
-      update();
+          // Kiểm tra xem mục đã tồn tại chưa
+          if (!existingIds.contains(cccdInfo.Id)) {
+            totalCCCD.add(cccdInfo); // Thêm mới
+          } else {
+            // Cập nhật thông tin nếu mục đã tồn tại
+            int index = totalCCCD.indexWhere((item) => item.Id == cccdInfo.Id);
+            totalCCCD[index] = cccdInfo; // Cập nhật thông tin
+          }
+        }
+
+        // Sắp xếp theo timestamp
+        totalCCCD.sort((a, b) => a.TimeStamp.compareTo(b.TimeStamp));
+
+        // Cập nhật chỉ số và tên hiện tại
+        if (totalCCCD.isNotEmpty) {
+          indexCurrent.value = 0;
+          nameCurrent.value = totalCCCD[indexCurrent.value].Name;
+        } else {
+          indexCurrent.value = 0;
+          nameCurrent.value = "";
+        }
+
+        update(); // Cập nhật trạng thái
+      });
     } catch (e) {
-      Get.snackbar("Thông báo", "Lỗi barcode");
-
-      // listTempMV = [];
+      Get.snackbar("Thông báo", "Lỗi khi lấy danh sách");
     }
   }
 
