@@ -6,9 +6,12 @@ class CCCDInfo {
   late String NgayLamCCCD;
   late String TimeStamp;
   late String gioiTinh;
+  String? maBuuGui; // Postal code field
+
   CCCDInfo(this.Name, this.NgaySinh, this.Id) {
     TimeStamp = DateTime.now().millisecondsSinceEpoch.toString();
     gioiTinh = "";
+    maBuuGui = null;
   }
 
   fromJson(Map<String, dynamic> json) {
@@ -17,6 +20,7 @@ class CCCDInfo {
     NgaySinh = json['NgaySinh'];
     TimeStamp = json['TimeStamp'];
     gioiTinh = json['gioiTinh'] ?? "";
+    maBuuGui = json['maBuuGui'];
   }
 
   Map<dynamic, dynamic> toJsonFull() => {
@@ -26,7 +30,8 @@ class CCCDInfo {
         'TimeStamp': TimeStamp,
         "DiaChi": DiaChi,
         "NgayLamCCCD": NgayLamCCCD,
-        "gioiTinh": gioiTinh
+        "gioiTinh": gioiTinh,
+        "maBuuGui": maBuuGui
       };
 
   Map<dynamic, dynamic> toJson() =>
@@ -34,6 +39,6 @@ class CCCDInfo {
 
   // Method để tạo chuỗi copy theo format yêu cầu
   String toCopyFormat(int index) {
-    return "$index\t$Id\t$Name\t$NgaySinh\t$gioiTinh\t$DiaChi";
+    return "$index\t${maBuuGui ?? ''}\t$Id\t$Name\t$NgaySinh\t$gioiTinh\t$DiaChi";
   }
 }

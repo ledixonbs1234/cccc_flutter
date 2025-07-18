@@ -20,12 +20,19 @@ class HomeController extends GetxController {
   final totalCCCD = <CCCDInfo>[].obs;
   final indexCurrent = 0.obs;
   final isAutoRun = false.obs;
+  final errorCCCDList = <CCCDInfo>[].obs;
+  final currentPostalCode = "".obs;
 
   final scrollController = ScrollController();
+  final postalCodeController = TextEditingController();
 
   @override
   void onInit() {
     super.onInit();
+    // Listen to postal code changes
+    postalCodeController.addListener(() {
+      currentPostalCode.value = postalCodeController.text;
+    });
   }
 
   String formatDateString(String inputDate) {
@@ -66,6 +73,10 @@ class HomeController extends GetxController {
       if (textSplit.length >= 5) {
         cccdInfo.gioiTinh = textSplit[4];
       }
+      // Thêm mã bưu gửi hiện tại
+      cccdInfo.maBuuGui =
+          currentPostalCode.value.isNotEmpty ? currentPostalCode.value : null;
+
       if (!isAutoRun.value) {
         sendCCCD(cccdInfo);
       } else {
@@ -103,6 +114,10 @@ class HomeController extends GetxController {
             cccdInfo.gioiTinh = textSplit[4];
             cccdInfo.DiaChi = textSplit[5];
           }
+          // Thêm mã bưu gửi hiện tại
+          cccdInfo.maBuuGui = currentPostalCode.value.isNotEmpty
+              ? currentPostalCode.value
+              : null;
           //tạo rung nhẹ
           AssetsAudioPlayer.newPlayer().open(
             Audio("assets/beep.mp3"),
@@ -154,12 +169,8 @@ class HomeController extends GetxController {
   }
 
   @override
-  void onReady() {
-    super.onReady();
-  }
-
-  @override
   void onClose() {
+    postalCodeController.dispose();
     super.onClose();
   }
 
@@ -412,5 +423,100 @@ class HomeController extends GetxController {
     Clipboard.setData(ClipboardData(text: buffer.toString()));
     Get.snackbar(
         "Thành công", "Đã copy ${totalCCCD.length} bản ghi vào clipboard");
+  }
+
+  /// Add current CCCD to error list and advance to next CCCD
+  void addCurrentCCCDToError() {
+    if (!isAutoRun.value) {
+      Get.snackbar(
+          "Thông báo", "Chức năng này chỉ hoạt động khi bật tự động chạy");
+      return;
+    }
+
+    if (indexCurrent.value < totalCCCD.length) {
+      CCCDInfo currentCCCD = totalCCCD[indexCurrent.value];
+
+      // Add to error list if not already there
+      if (!errorCCCDList.any((item) => item.Id == currentCCCD.Id)) {
+        errorCCCDList.add(currentCCCD);
+        Get.snackbar(
+            "Thông báo", "Đã thêm ${currentCCCD.Name} vào danh sách lỗi");
+      }
+
+      // Advance to next CCCD
+      advanceToNextCCCD();
+    }
+  }
+
+  /// Advance to the next CCCD in auto-run mode
+  void advanceToNextCCCD() {
+    if (indexCurrent.value < totalCCCD.length - 1) {
+      indexCurrent.value++;
+      nameCurrent.value = totalCCCD[indexCurrent.value].Name;
+
+      // Continue processing if auto-run is enabled
+      if (isAutoRun.value && !isSending) {
+        processCCCD();
+      }
+    } else {
+      // Reached end of list
+      Get.snackbar("Thông báo", "Đã xử lý hết danh sách CCCD");
+    }
+  }
+
+  /// Navigate to CCCD Error page
+  void navigateToCCCDErrorPage() {
+    Get.toNamed('/cccd_error', arguments: errorCCCDList.toList());
+  }
+
+  /// Update postal code for all future scanned CCCDs
+  void updatePostalCode(String newPostalCode) {
+    currentPostalCode.value = newPostalCode;
+    postalCodeController.text = newPostalCode;
+  }
+
+  /// Delete all CCCD data with confirmation dialog
+  void deleteAllCCCDData() {
+    if (totalCCCD.isEmpty) {
+      Get.snackbar("Thông báo", "Danh sách CCCD đã trống");
+      return;
+    }
+
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Xác nhận xóa tất cả'),
+        content: Text(
+            'Bạn có chắc muốn xóa tất cả ${totalCCCD.length} CCCD?\nHành động này không thể hoàn tác.'),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Hủy'),
+          ),
+          TextButton(
+            onPressed: () {
+              // Clear all CCCD data
+              totalCCCD.clear();
+              errorCCCDList.clear();
+
+              // Reset UI state
+              indexCurrent.value = 0;
+              nameCurrent.value = "";
+              isAutoRun.value = false;
+              isSending = false;
+
+              // Clear Firebase data
+              FirebaseManager().rootPath.child("listcccd").remove();
+
+              Get.back();
+              Get.snackbar("Thành công", "Đã xóa tất cả dữ liệu CCCD");
+            },
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
+            child: const Text('Xóa tất cả'),
+          ),
+        ],
+      ),
+    );
   }
 }

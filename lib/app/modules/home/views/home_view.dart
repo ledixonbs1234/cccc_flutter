@@ -20,6 +20,22 @@ class HomeView extends GetView<HomeController> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Section 0: Postal Code Input
+              TextField(
+                controller: controller.postalCodeController,
+                decoration: const InputDecoration(
+                  labelText: 'Mã bưu gửi',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.local_post_office),
+                  hintText: 'Nhập mã bưu gửi cho các CCCD tiếp theo',
+                ),
+                onChanged: (value) {
+                  controller.updatePostalCode(value);
+                },
+              ),
+
+              const SizedBox(height: 16.0),
+
               // Section 1: Action Buttons
               Row(
                 children: [
@@ -59,6 +75,27 @@ class HomeView extends GetView<HomeController> {
                     ),
                   ),
                 ],
+              ),
+
+              const SizedBox(height: 16.0),
+
+              // Section 1.5: Delete All Button
+              ElevatedButton(
+                onPressed: () {
+                  controller.deleteAllCCCDData();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.delete_forever),
+                    SizedBox(width: 8.0),
+                    Text('Xóa tất cả'),
+                  ],
+                ),
               ),
 
               const SizedBox(height: 16.0),
@@ -201,6 +238,52 @@ class HomeView extends GetView<HomeController> {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Auto-run mode buttons
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () {
+                                controller.addCurrentCCCDToError();
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.error),
+                                  SizedBox(width: 8.0),
+                                  Text('CCCD Lỗi'),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 16.0),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () {
+                                controller.navigateToCCCDErrorPage();
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.orange,
+                                foregroundColor: Colors.white,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.list_alt),
+                                  const SizedBox(width: 8.0),
+                                  Text(
+                                      'Xem Lỗi (${controller.errorCCCDList.length})'),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16.0),
                       Text(
                         'Danh sách CCCD đã quét:',
                         style: Theme.of(context).textTheme.titleLarge,
