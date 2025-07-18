@@ -1,8 +1,7 @@
 import 'dart:async';
 
 import 'package:assets_audio_player/assets_audio_player.dart';
-
-import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/material.dart';
 
 import 'package:flutter/services.dart';
 
@@ -15,14 +14,14 @@ import '../models/MessageModel.dart';
 import '../models/cccdInfo.dart';
 
 class HomeController extends GetxController {
-  //TODO: Implement HomeController
-
   final count = 0.obs;
   final nameCurrent = "".obs;
   final isRunning = false.obs;
   final totalCCCD = <CCCDInfo>[].obs;
   final indexCurrent = 0.obs;
   final isAutoRun = false.obs;
+
+  final scrollController = ScrollController();
 
   @override
   void onInit() {
@@ -39,15 +38,11 @@ class HomeController extends GetxController {
     }
 
     // Chia nhỏ chuỗi thành ngày, tháng, năm
-
     String day = inputDate.substring(0, 2);
-
     String month = inputDate.substring(2, 4);
-
     String year = inputDate.substring(4);
 
     // Tạo chuỗi mới theo định dạng "dd/MM/yyyy"
-
     String formattedDate = "$day/$month/$year";
 
     return formattedDate;
@@ -55,6 +50,33 @@ class HomeController extends GetxController {
 
   late StreamSubscription<dynamic>? streamCapture = null;
   late StreamSubscription<dynamic>? streamSaveData = null;
+  int number = 0;
+  void test() {
+//thay sau chữ Ngọc là số cho trước ví dụ Ngọc 1
+    number++;
+    String barcodeFilled =
+        "052321010762||Dương Lê Như Ngọc $number|20112021|Nữ|Tổ 7, Khu Phố Thiện Đức Bắc, Hoài Hương, Hoài Nhơn, Bình Định|06112024||Dương Văn Thông|Lê Thị Bích Nhiên|";
+    List<String> textSplit = barcodeFilled.split('|');
+
+    // Kiểm tra điều kiện
+    if ((textSplit.length == 7 || textSplit.length == 11)) {
+      CCCDInfo cccdInfo =
+          CCCDInfo(textSplit[2], formatDateString(textSplit[3]), textSplit[0]);
+      // Thêm giới tính nếu có
+      if (textSplit.length >= 5) {
+        cccdInfo.gioiTinh = textSplit[4];
+      }
+      if (!isAutoRun.value) {
+        sendCCCD(cccdInfo);
+      } else {
+        totalCCCD.add(cccdInfo);
+      }
+      // Nếu isAutoRun bật và không có yêu cầu đang gửi, bắt đầu xử lý hàng đợi
+      if (isAutoRun.value && !isSending) {
+        processCCCD();
+      }
+    }
+  }
 
   void capture() {
     try {
@@ -68,24 +90,32 @@ class HomeController extends GetxController {
           ?.listen((barcode) async {
         String barcodeFilled = barcode.trim().toString().toUpperCase();
 
-//052093000573|215277482|Lê Đi Xơn|08071993|Nam|Tổ 2, Khu phố Phụ Đức, Bồng Sơn, Hoài Nhơn, Bình Định|10042021
-
         List<String> textSplit = barcodeFilled.split('|');
 
-        if (textSplit.length == 7 && !tempBarcode.contains(barcodeFilled)) {
-          tempBarcode.add(barcodeFilled);
-
-          CCCDInfo cccdInfo = CCCDInfo(
-              textSplit[2], formatDateString(textSplit[3]), textSplit[0]);
-
-          sendCCCD(cccdInfo);
-        } else if (textSplit.length == 11 &&
+        // Kiểm tra điều kiện
+        if ((textSplit.length == 7 || textSplit.length == 11) &&
             !tempBarcode.contains(barcodeFilled)) {
           tempBarcode.add(barcodeFilled);
-
           CCCDInfo cccdInfo = CCCDInfo(
               textSplit[2], formatDateString(textSplit[3]), textSplit[0]);
-          sendCCCD(cccdInfo);
+          // Thêm giới tính nếu có
+          if (textSplit.length >= 5) {
+            cccdInfo.gioiTinh = textSplit[4];
+            cccdInfo.DiaChi = textSplit[5];
+          }
+          //tạo rung nhẹ
+          AssetsAudioPlayer.newPlayer().open(
+            Audio("assets/beep.mp3"),
+          );
+          if (!isAutoRun.value) {
+            sendCCCD(cccdInfo);
+          } else {
+            totalCCCD.add(cccdInfo);
+          }
+          // Nếu isAutoRun bật và không có yêu cầu đang gửi, bắt đầu xử lý hàng đợi
+          if (isAutoRun.value && !isSending) {
+            processCCCD();
+          }
         }
       });
     } on PlatformException {
@@ -95,13 +125,32 @@ class HomeController extends GetxController {
     update();
   }
 
+  bool isSending = false;
+
   void sendCCCD(CCCDInfo cccdInfo) {
     FirebaseManager().rootPath.child('cccd').set(cccdInfo.toJson());
+  }
 
-    AssetsAudioPlayer.newPlayer().open(
-      Audio("assets/beep.mp3"),
-      showNotification: true,
-    );
+  void processCCCD() {
+    // Chỉ xử lý khi isAutoRun được bật, không có yêu cầu đang gửi và còn dữ liệu chưa xử lý
+    if (isAutoRun.value &&
+        !isSending &&
+        indexCurrent.value < totalCCCD.length) {
+      // Lấy CCCDInfo tiếp theo
+      CCCDInfo cccdInfo = totalCCCD[indexCurrent.value];
+      nameCurrent.value = cccdInfo.Name;
+
+      // Đánh dấu là đang gửi
+      isSending = true;
+
+      // Gửi CCCD
+      sendCCCD(cccdInfo);
+
+      // Logic chờ phản hồi và xử lý mục tiếp theo sẽ nằm trong onListenNotification
+    } else if (!isAutoRun.value) {
+      isSending = false;
+      // Có thể reset indexCurrent.value = 0; ở đây nếu cần khi tắt auto run
+    }
   }
 
   @override
@@ -126,65 +175,46 @@ class HomeController extends GetxController {
               "#ff6666", 'Cancel', true, ScanMode.DEFAULT)
           ?.listen((barcode) async {
         String barcodeFilled = barcode.trim().toString().toUpperCase();
-
-//052093000573|215277482|Lê Đi Xơn|08071993|Nam|Tổ 2, Khu phố Phụ Đức, Bồng Sơn, Hoài Nhơn, Bình Định|10042021
-
         List<String> textSplit = barcodeFilled.split('|');
 
-        if (textSplit.length == 7 && !tempBarcode.contains(barcodeFilled)) {
-          tempBarcode.add(barcodeFilled);
-
-          CCCDInfo cccdInfo = CCCDInfo(
-              textSplit[2], formatDateString(textSplit[3]), textSplit[0]);
-          cccdInfo.DiaChi = textSplit[5];
-          cccdInfo.NgayLamCCCD = formatDateString(textSplit[6]);
-          cccdInfo.TimeStamp = DateTime.now().millisecondsSinceEpoch.toString();
-
-          FirebaseManager()
-              .rootPath
-              .child("listcccd")
-              .push()
-              .set(cccdInfo.toJsonFull());
-
-          AssetsAudioPlayer.newPlayer().open(
-            Audio("assets/beep.mp3"),
-            showNotification: true,
-          );
-
-//check is exist in firebase on child "listcccd"
-        } else if (textSplit.length == 11 &&
+        // Kiểm tra điều kiện và gọi hàm xử lý
+        if ((textSplit.length == 7 || textSplit.length == 11) &&
             !tempBarcode.contains(barcodeFilled)) {
           tempBarcode.add(barcodeFilled);
-
-          CCCDInfo cccdInfo = CCCDInfo(
-              textSplit[2], formatDateString(textSplit[3]), textSplit[0]);
-          cccdInfo.DiaChi = textSplit[5];
-          cccdInfo.NgayLamCCCD = formatDateString(textSplit[6]);
-          cccdInfo.TimeStamp = DateTime.now().millisecondsSinceEpoch.toString();
-
-          FirebaseManager()
-              .rootPath
-              .child("listcccd")
-              .push()
-              .set(cccdInfo.toJsonFull());
-
-          AssetsAudioPlayer.newPlayer().open(
-            Audio("assets/beep.mp3"),
-            showNotification: true,
-          );
+          await _processCCCDInfo(textSplit);
         }
       });
-
-      // listTempMV = [];
     } on PlatformException {
       Get.snackbar("Thông báo", "Lỗi barcode");
-
-      // listTempMV = [];
     }
 
-    //thuc hien cong viec trong nay
-
     update();
+  }
+
+  Future<void> _processCCCDInfo(List<String> textSplit) async {
+    CCCDInfo cccdInfo =
+        CCCDInfo(textSplit[2], formatDateString(textSplit[3]), textSplit[0]);
+
+    // Cập nhật thông tin cho CCCDInfo
+    cccdInfo.gioiTinh = textSplit.length >= 5 ? textSplit[4] : "";
+    cccdInfo.DiaChi = textSplit.length == 11
+        ? textSplit[5]
+        : (textSplit.length == 7 ? textSplit[5] : "");
+    cccdInfo.NgayLamCCCD = formatDateString(textSplit.last);
+    cccdInfo.TimeStamp = DateTime.now().millisecondsSinceEpoch.toString();
+
+    // Gửi dữ liệu lên Firebase
+    await FirebaseManager()
+        .rootPath
+        .child("listcccd")
+        .push()
+        .set(cccdInfo.toJsonFull());
+
+    // Phát âm thanh thông báo
+    await AssetsAudioPlayer.newPlayer().open(
+      Audio("assets/beep.mp3"),
+      showNotification: true,
+    );
   }
 
   Future<void> layDanhSach() async {
@@ -203,6 +233,9 @@ class HomeController extends GetxController {
           cccdInfo.Id = json.value['Id'];
           cccdInfo.NgaySinh = json.value['NgaySinh'];
           cccdInfo.TimeStamp = json.value['TimeStamp'];
+          cccdInfo.gioiTinh = json.value['gioiTinh'] ?? "";
+          cccdInfo.DiaChi = json.value['DiaChi'] ?? "";
+          cccdInfo.NgayLamCCCD = json.value['NgayLamCCCD'] ?? "";
 
           // Kiểm tra xem mục đã tồn tại chưa
           if (!existingIds.contains(cccdInfo.Id)) {
@@ -236,6 +269,8 @@ class HomeController extends GetxController {
   void deleteData() {
     FirebaseManager().rootPath.child("listcccd").remove();
     totalCCCD.clear();
+    isAutoRun.value = false;
+    isSending = false;
 
     indexCurrent.value = 0;
 
@@ -244,6 +279,7 @@ class HomeController extends GetxController {
   }
 
   void previousCCCD() {
+    if (isSending) return;
     //decrease totalCCCD down 1
     if (indexCurrent.value == 0) return;
     indexCurrent.value = indexCurrent.value - 1;
@@ -254,6 +290,7 @@ class HomeController extends GetxController {
   }
 
   void nextCCCD() {
+    if (isSending) return; // Không cho phép gửi tiếp khi đang gửi
     //decrease totalCCCD down 1
     if (indexCurrent.value == totalCCCD.length - 1) return;
     indexCurrent.value = indexCurrent.value + 1;
@@ -263,15 +300,117 @@ class HomeController extends GetxController {
     }
   }
 
+  void resendCurrentCCCD() {
+    if (isAutoRun.value && isSending && indexCurrent.value < totalCCCD.length) {
+      sendCCCD(totalCCCD[indexCurrent.value]);
+      Get.snackbar("Thông báo", "Đã gửi lại mã hiệu hiện tại.");
+    } else if (isAutoRun.value && !isSending) {
+      Get.snackbar("Thông báo", "Không có mã hiệu nào đang chờ gửi lại.");
+    } else if (!isAutoRun.value) {
+      Get.snackbar("Thông báo", "Chế độ tự động chạy không được bật.");
+    }
+  }
+
   void sendAutoRunToFirebase(bool isAuto) {
     FirebaseManager().sendAutoRunToFirebase(isAuto);
   }
 
   void onListenNotification(MessageReceiveModel message) {
     if (message.Lenh == "continueCCCD") {
+      isSending = false;
       if (isAutoRun.value) {
-        nextCCCD();
+        indexCurrent.value++;
+        // Sau khi nhận được tín hiệu hoàn thành và tăng index, gọi lại processCCCD để xử lý mục tiếp theo
+        processCCCD();
       }
     }
+  }
+
+  /// Removes Vietnamese diacritics from text for search comparison
+  String removeDiacritics(String text) {
+    // Define regex patterns for each Vietnamese vowel group and đ
+    final replacements = [
+      // Lowercase vowels
+      {'pattern': r'[àáạảãâầấậẩẫăằắặẳẵ]', 'replacement': 'a'},
+      {'pattern': r'[èéẹẻẽêềếệểễ]', 'replacement': 'e'},
+      {'pattern': r'[ìíịỉĩ]', 'replacement': 'i'},
+      {'pattern': r'[òóọỏõôồốộổỗơờớợởỡ]', 'replacement': 'o'},
+      {'pattern': r'[ùúụủũưừứựửữ]', 'replacement': 'u'},
+      {'pattern': r'[ỳýỵỷỹ]', 'replacement': 'y'},
+      {'pattern': r'đ', 'replacement': 'd'},
+
+      // Uppercase vowels
+      {'pattern': r'[ÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴ]', 'replacement': 'A'},
+      {'pattern': r'[ÈÉẸẺẼÊỀẾỆỂỄ]', 'replacement': 'E'},
+      {'pattern': r'[ÌÍỊỈĨ]', 'replacement': 'I'},
+      {'pattern': r'[ÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠ]', 'replacement': 'O'},
+      {'pattern': r'[ÙÚỤỦŨƯỪỨỰỬỮ]', 'replacement': 'U'},
+      {'pattern': r'[ỲÝỴỶỸ]', 'replacement': 'Y'},
+      {'pattern': r'Đ', 'replacement': 'D'},
+    ];
+
+    String result = text;
+    for (var replacement in replacements) {
+      result = result.replaceAll(
+          RegExp(replacement['pattern']!), replacement['replacement']!);
+    }
+    return result;
+  }
+
+  void searchCCCD(String value) {
+    // Skip search if value is empty
+    if (value.trim().isEmpty) {
+      return;
+    }
+
+    // Normalize search value by removing diacritics and converting to lowercase
+    String normalizedSearchValue = removeDiacritics(value.trim().toLowerCase());
+
+    // Find the first matching CCCD by comparing normalized names
+    int index = totalCCCD.indexWhere((item) {
+      String normalizedName = removeDiacritics(item.Name.toLowerCase());
+      return normalizedName.contains(normalizedSearchValue);
+    });
+
+    if (index != -1) {
+      // Calculate accurate scroll position based on actual ListView item structure:
+      // - Card with vertical margin: 4.0 * 2 = 8.0
+      // - ListTile with leading icon, title, and subtitle: ~72.0
+      // - Card internal padding and content: ~8.0
+      // Total estimated height per item: ~88.0
+      double estimatedItemHeight = 88.0;
+
+      // Calculate target scroll position
+      double targetPosition = index * estimatedItemHeight;
+
+      // Ensure we don't scroll beyond the maximum scroll extent
+      double maxScrollExtent = scrollController.position.maxScrollExtent;
+      double finalPosition =
+          targetPosition > maxScrollExtent ? maxScrollExtent : targetPosition;
+
+      // Animate to the calculated position
+      scrollController.animateTo(
+        finalPosition,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  // Method để copy tất cả dữ liệu CCCD theo format yêu cầu
+  void copyAllCCCDData() {
+    if (totalCCCD.isEmpty) {
+      Get.snackbar("Thông báo", "Không có dữ liệu để copy");
+      return;
+    }
+
+    StringBuffer buffer = StringBuffer();
+    for (int i = 0; i < totalCCCD.length; i++) {
+      buffer.writeln(totalCCCD[i].toCopyFormat(i + 1));
+    }
+
+    Clipboard.setData(ClipboardData(text: buffer.toString()));
+    Get.snackbar(
+        "Thành công", "Đã copy ${totalCCCD.length} bản ghi vào clipboard");
   }
 }

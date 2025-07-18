@@ -11,105 +11,255 @@ class HomeView extends GetView<HomeController> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('HomeView'),
+        title: const Text('Ứng dụng Quét CCCD'),
         centerTitle: true,
       ),
-      body: Center(
-        child: Column(
-          children: [
-            const Text(
-              'HomeView is working',
-              style: TextStyle(fontSize: 20),
-            ),
-            ElevatedButton(
-                onPressed: () {
-                  controller.capture();
-                },
-                child: const Text('Capture')),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                ElevatedButton(
-                    onPressed: () {
-                      controller.saveData();
-                    },
-                    child: const Text('Lưu Trữ')),
-                ElevatedButton(
-                    onPressed: () {
-                      controller.deleteData();
-                    },
-                    child: const Text('Xóa'))
-              ],
-            ),
-            ElevatedButton(
-                onPressed: () {
-                  controller.layDanhSach();
-                },
-                child: const Text('Lấy Danh Sách')),
-            Obx(
-              () => Card(
-                child: Column(
-                  children: [
-                    Text(
-                        'Số lượng: ${controller.indexCurrent} / ${controller.totalCCCD.length}'),
-                    Text('Name: ${controller.nameCurrent}'),
-                    Text('Đang chạy: ${controller.isRunning}'),
-                    Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Section 1: Action Buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        controller.capture();
+                      },
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          SizedBox(
-                            width: 100,
-                            child: Row(
+                          Icon(Icons.camera_alt),
+                          SizedBox(width: 8.0),
+                          Text('Capture'),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16.0),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        controller.copyAllCCCDData();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.copy),
+                          SizedBox(width: 8.0),
+                          Text('Copy Data'),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 16.0),
+
+              // Section 2: Status Card
+              Obx(
+                () => Card(
+                  margin: EdgeInsets.zero, // Remove default Card margin
+                  elevation: 2.0, // Add a subtle shadow
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.numbers, size: 20.0),
+                            const SizedBox(width: 8.0),
+                            Text(
+                              'Số lượng: ${controller.indexCurrent.value} / ${controller.totalCCCD.length}',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8.0),
+                        Row(
+                          children: [
+                            const Icon(Icons.person, size: 20.0),
+                            const SizedBox(width: 8.0),
+                            Text(
+                              'Name: ${controller.nameCurrent.value}',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8.0),
+                        Row(
+                          children: [
+                            const Icon(Icons.play_arrow, size: 20.0),
+                            const SizedBox(width: 8.0),
+                            Text(
+                              'Đang chạy: ${controller.isRunning.value}',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16.0),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
                                 Checkbox(
-                                    value: controller.isRunning.value,
-                                    onChanged: (value) {
-                                      controller.isRunning.value = value!;
-                                      if (value) {
-                                        controller.sendCCCD(
-                                            controller.totalCCCD[
-                                                controller.indexCurrent.value]);
-                                      }
-                                    }),
-                                Text('Gửi')
+                                  value: controller.isRunning.value,
+                                  onChanged: (value) {
+                                    controller.isRunning.value = value!;
+                                    if (value) {
+                                      controller.sendCCCD(controller.totalCCCD[
+                                          controller.indexCurrent.value]);
+                                    }
+                                  },
+                                ),
+                                const Text('Gửi'),
+                              ],
+                            ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Checkbox(
+                                  value: controller.isAutoRun.value,
+                                  onChanged: (value) {
+                                    controller.isAutoRun.value = value!;
+                                    if (controller.isAutoRun.value) {
+                                      controller.processCCCD();
+                                    } else {
+                                      controller.isSending = false;
+                                    }
+                                    controller.sendAutoRunToFirebase(value);
+                                  },
+                                ),
+                                const Text('Tự động chạy'),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16.0),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            ElevatedButton(
+                              onPressed: () {
+                                controller.previousCCCD();
+                              },
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.arrow_left),
+                                  SizedBox(width: 4.0),
+                                  Text('Left'),
+                                ],
+                              ),
+                            ),
+                            ElevatedButton(
+                              onPressed: () {
+                                controller.nextCCCD();
+                              },
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text('Right'),
+                                  SizedBox(width: 4.0),
+                                  Icon(Icons.arrow_right),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16.0),
+              //create a textbox to find cccd from name
+              TextField(
+                onChanged: (value) {
+                  controller.searchCCCD(value);
+                },
+                decoration: InputDecoration(
+                  labelText: 'Tìm kiếm CCCD',
+                  border: OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.search),
+                ),
+              ),
+
+              // Section 3: Conditional CCCD List and Resend Button
+              Obx(() {
+                if (controller.isAutoRun.value) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Danh sách CCCD đã quét:',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 8.0),
+                      // Display the list of CCCD
+                      SizedBox(
+                        height: 300.0, // Set a fixed height for the ListView
+                        child: ListView.builder(
+                          controller: controller.scrollController,
+                          shrinkWrap:
+                              true, // Important for nested ListView in SingleChildScrollView
+                          physics:
+                              const AlwaysScrollableScrollPhysics(), // Enable ListView scrolling
+                          itemCount: controller.totalCCCD.length,
+                          itemBuilder: (context, index) {
+                            final cccd = controller.totalCCCD[index];
+                            return Card(
+                              margin: const EdgeInsets.symmetric(vertical: 4.0),
+                              child: ListTile(
+                                leading: const Icon(
+                                    Icons.credit_card), // Add leading icon
+                                title: Text(
+                                    "${index + 1} ${cccd.Name}"), // Corrected property access
+                                subtitle: Text(
+                                    'ID: ${cccd.Id}'), // Corrected property access
+                                // Add more details if needed
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      if (controller
+                          .isSending) // Show "Gửi lại" only when sending
+                        Padding(
+                          padding: const EdgeInsets.only(top: 16.0),
+                          child: ElevatedButton(
+                            onPressed: () {
+                              controller.resendCurrentCCCD();
+                            },
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.refresh),
+                                SizedBox(width: 8.0),
+                                Text('Gửi lại'),
                               ],
                             ),
                           ),
-                          SizedBox(
-                            width: 150,
-                            child: Row(
-                              children: [
-                                Checkbox(
-                                    value: controller.isAutoRun.value,
-                                    onChanged: (value) {
-                                      controller.isAutoRun.value = value!;
-                                      controller.sendAutoRunToFirebase(value);
-                                    }),
-                                Text('Tự động chạy')
-                              ],
-                            ),
-                          )
-                        ]),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        ElevatedButton(
-                            onPressed: () {
-                              controller.previousCCCD();
-                            },
-                            child: const Text('Left')),
-                        ElevatedButton(
-                            onPressed: () {
-                              controller.nextCCCD();
-                            },
-                            child: const Text('Right')),
-                      ],
-                    )
-                  ],
-                ),
-              ),
-            ),
-          ],
+                        ),
+                    ],
+                  );
+                } else {
+                  return const SizedBox
+                      .shrink(); // Hide the section when not auto-running
+                }
+              }),
+            ],
+          ),
         ),
       ),
     );

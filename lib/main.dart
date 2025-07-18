@@ -1,4 +1,3 @@
-import 'package:cccc_flutter/app/routes/app_pages.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
@@ -7,7 +6,9 @@ import 'package:get/get_navigation/src/root/get_material_app.dart';
 
 import 'app/managers/fireabaseManager.dart';
 import 'app/modules/home/controllers/home_controller.dart';
+import 'app/routes/app_pages.dart';
 import 'firebase_options.dart';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // AwesomeNotifications().initialize(
@@ -41,6 +42,7 @@ Future<void> main() async {
 
   runApp(
     GetMaterialApp(
+      debugShowCheckedModeBanner: false,
       title: "Application",
       initialRoute: AppPages.INITIAL,
       getPages: AppPages.routes,

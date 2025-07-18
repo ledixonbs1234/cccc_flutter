@@ -5,16 +5,18 @@ class CCCDInfo {
   late String DiaChi;
   late String NgayLamCCCD;
   late String TimeStamp;
+  late String gioiTinh;
   CCCDInfo(this.Name, this.NgaySinh, this.Id) {
     TimeStamp = DateTime.now().millisecondsSinceEpoch.toString();
+    gioiTinh = "";
   }
-  
 
   fromJson(Map<String, dynamic> json) {
     Name = json['Name'];
     Id = json['Id'];
     NgaySinh = json['NgaySinh'];
     TimeStamp = json['TimeStamp'];
+    gioiTinh = json['gioiTinh'] ?? "";
   }
 
   Map<dynamic, dynamic> toJsonFull() => {
@@ -23,9 +25,15 @@ class CCCDInfo {
         'NgaySinh': NgaySinh,
         'TimeStamp': TimeStamp,
         "DiaChi": DiaChi,
-        "NgayLamCCCD": NgayLamCCCD
+        "NgayLamCCCD": NgayLamCCCD,
+        "gioiTinh": gioiTinh
       };
 
   Map<dynamic, dynamic> toJson() =>
       {'Name': Name, 'Id': Id, 'NgaySinh': NgaySinh, 'TimeStamp': TimeStamp};
+
+  // Method để tạo chuỗi copy theo format yêu cầu
+  String toCopyFormat(int index) {
+    return "$index\t$Id\t$Name\t$NgaySinh\t$gioiTinh\t$DiaChi";
+  }
 }
