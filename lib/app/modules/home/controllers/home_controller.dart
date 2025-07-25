@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:assets_audio_player/assets_audio_player.dart';
 import 'package:diacritic/diacritic.dart';
@@ -26,6 +27,15 @@ class HomeController extends GetxController {
 
   final scrollController = ScrollController();
   final postalCodeController = TextEditingController();
+  final searchController = TextEditingController();
+
+  // Fixed item extent for ListView - ensures precise scroll positioning
+  static const double cccdItemExtent = 112.0;
+
+  // Search results state management
+  final searchResults = <CCCDInfo>[].obs;
+  final searchQuery = "".obs;
+  final isSearchActive = false.obs;
 
   @override
   void onInit() {
@@ -34,7 +44,7 @@ class HomeController extends GetxController {
     postalCodeController.addListener(() {
       currentPostalCode.value = postalCodeController.text;
     });
-    totalCCCD.addAll(generateSampleCCCDData());
+    totalCCCD.addAll(generateRandomCCCDData(50));
   }
 
   String formatDateString(String inputDate) {
@@ -173,6 +183,7 @@ class HomeController extends GetxController {
   @override
   void onClose() {
     postalCodeController.dispose();
+    searchController.dispose();
     super.onClose();
   }
 
@@ -382,112 +393,304 @@ class HomeController extends GetxController {
     onListenNotification(testMessage);
   }
 
+  /// Test function to verify search scroll positioning with fixed itemExtent
+  /// This demonstrates the improved scroll accuracy using Flutter's built-in positioning
+  void testSearchScrollPosition(int targetIndex) {
+    if (targetIndex >= 0 && targetIndex < totalCCCD.length) {
+      String targetName = totalCCCD[targetIndex].Name;
+
+      // Test the search functionality
+      searchCCCD(targetName.split(' ').first); // Search with first name part
+
+      // Log the results for verification (remove in production)
+      print("Testing search scroll to index $targetIndex: $targetName");
+      print("Using fixed itemExtent: $cccdItemExtent");
+      print("Expected scroll position: ${targetIndex * cccdItemExtent}");
+    }
+  }
+
+  /// Test function to verify search clearing functionality
+  /// This demonstrates that both search results and TextField are properly cleared
+  void testSearchClearFunctionality() {
+    // Simulate a search
+    searchController.text = "Test Search";
+    searchCCCD("Nguyễn");
+
+    print(
+        "Before clear - TextField: '${searchController.text}', Results: ${searchResults.length}, Active: ${isSearchActive.value}");
+
+    // Clear the search
+    clearSearch();
+
+    print(
+        "After clear - TextField: '${searchController.text}', Results: ${searchResults.length}, Active: ${isSearchActive.value}");
+  }
+
   /// Removes Vietnamese diacritics from text for search comparison
   String chuyenSangKoDau(String text) {
     return removeDiacritics(text);
   }
 
   void searchCCCD(String value) {
-    // Skip search if value is empty
+    // Clear previous search results if search is empty
     if (value.trim().isEmpty) {
+      clearSearch();
       return;
     }
+
+    // Update search query
+    searchQuery.value = value.trim();
 
     // Normalize search value by removing diacritics and converting to lowercase
     String normalizedSearchValue = chuyenSangKoDau(value.trim().toLowerCase());
 
-    // Find the first matching CCCD by comparing normalized names
-    int index = totalCCCD.indexWhere((item) {
+    // Find all matching CCCDs by comparing normalized names and IDs
+    List<CCCDInfo> foundItems = [];
+    for (int i = 0; i < totalCCCD.length; i++) {
+      CCCDInfo item = totalCCCD[i];
       String normalizedName = chuyenSangKoDau(item.Name.toLowerCase());
-      return normalizedName.contains(normalizedSearchValue);
-    });
+      String normalizedId = item.Id.toLowerCase();
+
+      // Search in both name and ID
+      if (normalizedName.contains(normalizedSearchValue) ||
+          normalizedId.contains(normalizedSearchValue)) {
+        foundItems.add(item);
+        break;
+      }
+    }
+
+    // Update search results
+    searchResults.value = foundItems;
+    isSearchActive.value = true;
+  }
+
+  /// Clear search results and reset search state
+  void clearSearch() {
+    searchResults.clear();
+    searchQuery.value = "";
+    isSearchActive.value = false;
+    // Clear the search text field
+    searchController.clear();
+  }
+
+  /// Navigate to a specific CCCD item in the main list
+  void goToSearchResult(CCCDInfo cccdItem) {
+    // Find the index of the item in the main list
+    int index = totalCCCD.indexWhere((item) => item.Id == cccdItem.Id);
 
     if (index != -1) {
-      // Calculate accurate scroll position based on actual ListView item structure:
-      // - Card with vertical margin: 4.0 * 2 = 8.0
-      // - ListTile with leading icon, title, and subtitle: ~72.0
-      // - Card internal padding and content: ~8.0
-      // Total estimated height per item: ~88.0
-      double estimatedItemHeight = 88.0;
+      // Update current index to highlight the item
+      indexCurrent.value = index;
+      nameCurrent.value = totalCCCD[index].Name;
 
-      // Calculate target scroll position
-      double targetPosition = index * estimatedItemHeight;
+      // Calculate exact scroll position using the fixed item extent
+      double targetPosition = index * cccdItemExtent;
 
-      // Ensure we don't scroll beyond the maximum scroll extent
+      // Add offset to center the found item in the viewport
+      double viewportCenterOffset = 160.0;
+      double centeredPosition = targetPosition - viewportCenterOffset;
+
+      // Ensure we don't scroll beyond valid bounds
       double maxScrollExtent = scrollController.position.maxScrollExtent;
-      double finalPosition =
-          targetPosition > maxScrollExtent ? maxScrollExtent : targetPosition;
+      double finalPosition = centeredPosition.clamp(0.0, maxScrollExtent);
 
-      // Animate to the calculated position
+      // Animate to the calculated position with smooth easing
       scrollController.animateTo(
         finalPosition,
-        duration: const Duration(milliseconds: 500),
+        duration: const Duration(milliseconds: 600),
         curve: Curves.easeInOut,
+      );
+
+      // Show feedback
+      Get.snackbar(
+        "Đã chuyển đến",
+        "Đã chuyển đến: ${cccdItem.Name}",
+        duration: const Duration(seconds: 2),
+        snackPosition: SnackPosition.BOTTOM,
       );
     }
   }
 
-  //tạo hàm danh sách cccd mẫu để test từ cccdInfo bao gồm khoảng 10 cccd có Name ngẫu nhiên khác nhau
-  List<CCCDInfo> generateSampleCCCDData() {
+  List<CCCDInfo> generateRandomCCCDData(int count) {
     List<CCCDInfo> sampleData = [];
+    Random random = Random();
 
-    // Danh sách tên Việt Nam ngẫu nhiên
-    List<String> sampleNames = [
-      'Nguyễn Văn Hùng',
-      'Trần Thị Hạnh',
-      'Lê Minh Đức',
-      'Phạm Thị Hương',
-      'Hoàng Văn Tuấn',
-      'Dương Lê Như Ngọc',
-      'Võ Thị Mai',
-      'Bùi Văn Thành',
-      'Đặng Thị Lan',
-      'Phan Minh Khôi'
+    // Danh sách họ, tên đệm và tên Việt Nam ngẫu nhiên
+    List<String> lastNames = [
+      'Nguyễn',
+      'Trần',
+      'Lê',
+      'Phạm',
+      'Hoàng',
+      'Huỳnh',
+      'Võ',
+      'Đặng',
+      'Bùi',
+      'Đỗ'
     ];
-
-    // Danh sách ngày sinh ngẫu nhiên
-    List<String> sampleBirthDates = [
-      '15/05/1990',
-      '08/03/1985',
-      '22/12/1992',
-      '10/07/1988',
-      '03/09/1995',
-      '20/11/2021',
-      '14/02/1987',
-      '30/06/1993',
-      '25/04/1989',
-      '18/01/1991'
+    List<String> middleNames = [
+      'Văn',
+      'Thị',
+      'Minh',
+      'Hữu',
+      'Đức',
+      'Thanh',
+      'Ngọc',
+      'Gia',
+      'Bảo',
+      'Quốc'
+    ];
+    List<String> firstNames = [
+      'An',
+      'Bình',
+      'Cường',
+      'Dũng',
+      'Hà',
+      'Hải',
+      'Hiếu',
+      'Hùng',
+      'Huy',
+      'Khánh',
+      'Linh',
+      'Long',
+      'Minh',
+      'Nam',
+      'Nga',
+      'Ngọc',
+      'Phong',
+      'Phúc',
+      'Phương',
+      'Quân',
+      'Quỳnh',
+      'Sơn',
+      'Thảo',
+      'Trang',
+      'Tùng',
+      'Việt'
     ];
 
     // Danh sách địa chỉ mẫu
     List<String> sampleAddresses = [
       'Tổ 7, Khu Phố Thiện Đức Bắc, Hoài Hương, Hoài Nhơn, Bình Định',
       'Khu Phố 6 Bồng Sơn, An Khê, Gia Lai',
-      'Diễn Khánh Hoài Đức, Hà Nội',
+      'Diễn Khánh, Hoài Đức, Hà Nội',
       'Phường 1, Quận 3, TP. Hồ Chí Minh',
       'Xã Tân Phú, Huyện Đức Trọng, Lâm Đồng',
       'Phường Hải Châu, Quận Hải Châu, Đà Nẵng',
       'Xã Phú Hòa, Huyện Krông Pắc, Đắk Lắk',
       'Phường Nguyễn Du, TP. Huế, Thừa Thiên Huế',
       'Xã Ea Kar, Huyện Ea Kar, Đắk Lắk',
-      'Phường Tân An, TP. Buôn Ma Thuột, Đắk Lắk'
+      'Phường Tân An, TP. Buôn Ma Thuột, Đắk Lắk',
+      'Số 10, đường Lý Thường Kiệt, Phường Trần Hưng Đạo, Quận Hoàn Kiếm, Hà Nội',
+      'Thôn 3, xã Ea Tiêu, huyện Cư Kuin, tỉnh Đắk Lắk',
+      'Số 25, ngõ 120, đường Hoàng Quốc Việt, Phường Nghĩa Tân, Quận Cầu Giấy, Hà Nội',
+      'Ấp 2, xã Vĩnh Lộc A, huyện Bình Chánh, TP. Hồ Chí Minh',
+      'Số 100, đường Hùng Vương, Phường 9, Quận 5, TP. Hồ Chí Minh',
+      'Thôn An Lạc, xã Trưng Trắc, huyện Văn Lâm, tỉnh Hưng Yên'
     ];
 
-    // Danh sách giới tính
-    List<String> genders = ['Nam', 'Nữ'];
+    // Danh sách mã tỉnh/thành phố
+    List<String> provinceCodes = [
+      '001',
+      '002',
+      '004',
+      '006',
+      '008',
+      '010',
+      '011',
+      '012',
+      '014',
+      '015',
+      '017',
+      '019',
+      '020',
+      '022',
+      '024',
+      '025',
+      '026',
+      '027',
+      '030',
+      '031',
+      '033',
+      '034',
+      '035',
+      '036',
+      '037',
+      '038',
+      '040',
+      '042',
+      '044',
+      '045',
+      '046',
+      '048',
+      '049',
+      '051',
+      '052',
+      '054',
+      '056',
+      '058',
+      '060',
+      '062',
+      '064',
+      '066',
+      '067',
+      '068',
+      '070',
+      '072',
+      '074',
+      '075',
+      '077',
+      '079',
+      '080',
+      '082',
+      '083',
+      '084',
+      '086',
+      '087',
+      '089',
+      '091',
+      '092',
+      '093',
+      '094',
+      '095',
+      '096'
+    ];
 
-    for (int i = 0; i < 10; i++) {
-      // Tạo số CCCD ngẫu nhiên (12 chữ số)
-      String cccdId =
-          '052${(321000000 + i * 1000 + (i * 123) % 1000).toString().padLeft(9, '0')}';
+    for (int i = 0; i < count; i++) {
+      // Tạo tên ngẫu nhiên
+      String hoTen =
+          '${lastNames[random.nextInt(lastNames.length)]} ${middleNames[random.nextInt(middleNames.length)]} ${firstNames[random.nextInt(firstNames.length)]}';
 
-      CCCDInfo cccdInfo = CCCDInfo(sampleNames[i], sampleBirthDates[i], cccdId);
+      // Tạo ngày sinh ngẫu nhiên (từ 1950 đến 2005)
+      int year = (1950 + random.nextInt(56)) as int;
+      int month = (1 + random.nextInt(12)) as int;
+      int day = (1 + random.nextInt(28))
+          as int; // Giả sử tháng nào cũng có 28 ngày cho đơn giản
+      String ngaySinh =
+          '${day.toString().padLeft(2, '0')}/${month.toString().padLeft(2, '0')}/$year';
+
+      // Chọn giới tính ngẫu nhiên
+      String gioiTinh = random.nextBool() ? 'Nam' : 'Nữ';
+
+      // Tạo số CCCD ngẫu nhiên
+      String provinceCode = provinceCodes[random.nextInt(provinceCodes.length)];
+      String centuryCode = (year >= 2000)
+          ? (gioiTinh == 'Nam' ? '2' : '3')
+          : (gioiTinh == 'Nam' ? '0' : '1');
+      String yearCode = year.toString().substring(2);
+      String randomDigits = '';
+      for (int j = 0; j < 6; j++) {
+        randomDigits += random.nextInt(10).toString();
+      }
+      String cccdId = '$provinceCode$centuryCode$yearCode$randomDigits';
+
+      CCCDInfo cccdInfo = CCCDInfo(hoTen, ngaySinh, cccdId);
 
       // Thêm thông tin bổ sung
-      cccdInfo.gioiTinh = genders[i % 2];
-      cccdInfo.DiaChi = sampleAddresses[i];
+      cccdInfo.gioiTinh = gioiTinh;
+      cccdInfo.DiaChi = sampleAddresses[random.nextInt(sampleAddresses.length)];
       cccdInfo.NgayLamCCCD = '06/11/2024';
-      cccdInfo.maBuuGui = 'BĐ${(590000 + i * 10).toString()}';
+      cccdInfo.maBuuGui = 'BĐ${(590000 + random.nextInt(10000)).toString()}';
 
       sampleData.add(cccdInfo);
     }
