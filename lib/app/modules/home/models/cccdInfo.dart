@@ -3,10 +3,10 @@ class CCCDInfo {
   late String Id;
   late String NgaySinh;
   late String DiaChi;
-  late String NgayLamCCCD;
+  late String? NgayLamCCCD = "";
   late String TimeStamp;
   late String gioiTinh;
-  String? maBuuGui; // Postal code field
+  String? maBuuGui = ""; // Postal code field
 
   CCCDInfo(this.Name, this.NgaySinh, this.Id) {
     TimeStamp = DateTime.now().millisecondsSinceEpoch.toString();
@@ -29,9 +29,9 @@ class CCCDInfo {
         'NgaySinh': NgaySinh,
         'TimeStamp': TimeStamp,
         "DiaChi": DiaChi,
-        "NgayLamCCCD": NgayLamCCCD,
+        "NgayLamCCCD": NgayLamCCCD ?? "",
         "gioiTinh": gioiTinh,
-        "maBuuGui": maBuuGui
+        "maBuuGui": maBuuGui ?? ""
       };
 
   Map<dynamic, dynamic> toJson() =>

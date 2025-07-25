@@ -49,27 +49,13 @@ class HomeView extends GetView<HomeController> {
                         children: [
                           Icon(Icons.camera_alt),
                           SizedBox(width: 8.0),
-                          Text('Capture'),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16.0),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        controller.copyAllCCCDData();
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        foregroundColor: Colors.white,
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.copy),
-                          SizedBox(width: 8.0),
-                          Text('Copy Data'),
+                          Flexible(
+                            child: Text(
+                              'Capture',
+                              style: TextStyle(fontSize: 13),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -93,7 +79,13 @@ class HomeView extends GetView<HomeController> {
                   children: [
                     Icon(Icons.delete_forever),
                     SizedBox(width: 8.0),
-                    Text('Xóa tất cả'),
+                    Flexible(
+                      child: Text(
+                        'Xóa tất cả',
+                        style: TextStyle(fontSize: 13),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -255,7 +247,13 @@ class HomeView extends GetView<HomeController> {
                                 children: [
                                   Icon(Icons.error),
                                   SizedBox(width: 8.0),
-                                  Text('CCCD Lỗi'),
+                                  Flexible(
+                                    child: Text(
+                                      'CCCD Lỗi',
+                                      style: TextStyle(fontSize: 13),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -275,8 +273,13 @@ class HomeView extends GetView<HomeController> {
                                 children: [
                                   const Icon(Icons.list_alt),
                                   const SizedBox(width: 8.0),
-                                  Text(
-                                      'Xem Lỗi (${controller.errorCCCDList.length})'),
+                                  Flexible(
+                                    child: Text(
+                                      'Xem Lỗi (${controller.errorCCCDList.length})',
+                                      style: const TextStyle(fontSize: 13),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),

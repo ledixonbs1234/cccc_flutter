@@ -37,11 +37,11 @@ void main() {
 
     // Find matching CCCD using the same logic as searchCCCD method
     String normalizedSearchValue =
-        controller.removeDiacritics(searchTerm.toLowerCase());
+        controller.chuyenSangKoDau(searchTerm.toLowerCase());
 
     int foundIndex = controller.totalCCCD.indexWhere((item) {
       String normalizedName =
-          controller.removeDiacritics(item.Name.toLowerCase());
+          controller.chuyenSangKoDau(item.Name.toLowerCase());
       return normalizedName.contains(normalizedSearchValue);
     });
 
@@ -64,13 +64,13 @@ void main() {
 
   // Show some examples of diacritic removal
   final examples = [
-    'Ngọc → ${controller.removeDiacritics('Ngọc')}',
-    'Dương → ${controller.removeDiacritics('Dương')}',
-    'Hùng → ${controller.removeDiacritics('Hùng')}',
-    'Hạnh → ${controller.removeDiacritics('Hạnh')}',
-    'Đức → ${controller.removeDiacritics('Đức')}',
-    'Hương → ${controller.removeDiacritics('Hương')}',
-    'Tuấn → ${controller.removeDiacritics('Tuấn')}',
+    'Ngọc → ${controller.chuyenSangKoDau('Ngọc')}',
+    'Dương → ${controller.chuyenSangKoDau('Dương')}',
+    'Hùng → ${controller.chuyenSangKoDau('Hùng')}',
+    'Hạnh → ${controller.chuyenSangKoDau('Hạnh')}',
+    'Đức → ${controller.chuyenSangKoDau('Đức')}',
+    'Hương → ${controller.chuyenSangKoDau('Hương')}',
+    'Tuấn → ${controller.chuyenSangKoDau('Tuấn')}',
   ];
 
   for (var example in examples) {

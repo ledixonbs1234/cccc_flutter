@@ -25,6 +25,32 @@ class CccdErrorView extends GetView<CccdErrorController> {
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () {
+                      controller.syncErrorCCCDsToFirebase();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.cloud_upload),
+                        SizedBox(width: 8.0),
+                        Flexible(
+                          child: Text(
+                            'Sync to Firebase',
+                            style: TextStyle(fontSize: 13),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16.0),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
                       controller.copyAllErrorCCCDData();
                     },
                     style: ElevatedButton.styleFrom(
@@ -36,12 +62,17 @@ class CccdErrorView extends GetView<CccdErrorController> {
                       children: [
                         Icon(Icons.copy),
                         SizedBox(width: 8.0),
-                        Text('Copy Data'),
+                        Flexible(
+                          child: Text(
+                            'Copy Data',
+                            style: TextStyle(fontSize: 13),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(width: 16.0),
               ],
             ),
 
@@ -64,27 +95,46 @@ class CccdErrorView extends GetView<CccdErrorController> {
                       children: [
                         Icon(Icons.clear_all),
                         SizedBox(width: 8.0),
-                        Text('Xóa tất cả'),
+                        Flexible(
+                          child: Text(
+                            'Xóa tất cả',
+                            style: TextStyle(fontSize: 13),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(width: 16.0),
+              ],
+            ),
+
+            const SizedBox(height: 16.0),
+
+            // Third Action Buttons Row - Firebase Status
+            Row(
+              children: [
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () {
-                      controller.showFileLocationInfo();
+                      controller.checkFirebaseErrorStatus();
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey.shade600,
+                      backgroundColor: Colors.purple,
                       foregroundColor: Colors.white,
                     ),
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.info_outline),
+                        Icon(Icons.cloud_done),
                         SizedBox(width: 8.0),
-                        Text('Vị trí file'),
+                        Flexible(
+                          child: Text(
+                            'Firebase Status',
+                            style: TextStyle(fontSize: 13),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                       ],
                     ),
                   ),

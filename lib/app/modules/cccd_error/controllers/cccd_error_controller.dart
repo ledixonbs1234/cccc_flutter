@@ -1,12 +1,9 @@
-import 'dart:io';
-import 'package:excel/excel.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:get/get.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 import '../../home/models/cccdInfo.dart';
+import '../../../managers/fireabaseManager.dart';
 
 class CccdErrorController extends GetxController {
   final errorCCCDList = <CCCDInfo>[].obs;
@@ -21,7 +18,68 @@ class CccdErrorController extends GetxController {
     }
   }
 
-  /// Copy all error CCCD data to clipboard
+  /// Sync all error CCCD data to Firebase Realtime Database
+  /// (Optimized for a single write operation)
+  Future<void> syncErrorCCCDsToFirebase() async {
+    if (errorCCCDList.isEmpty) {
+      Get.snackbar("Thông báo", "Không có dữ liệu lỗi để đồng bộ");
+      return;
+    }
+
+    try {
+      // Chuẩn bị một Map để chứa tất cả các bản ghi lỗi.
+      // Các key của map này sẽ là các ID duy nhất được tạo bởi push().key.
+      Map<String, dynamic> recordsMap = {};
+      final recordsRef =
+          FirebaseManager().rootPath.child('errorcccd').child('records');
+
+      for (int i = 0; i < errorCCCDList.length; i++) {
+        CCCDInfo errorCCCD = errorCCCDList[i];
+
+        Map<String, dynamic> errorRecord =
+            Map<String, dynamic>.from(errorCCCD.toJsonFull());
+        errorRecord['errorIndex'] = i + 1;
+        errorRecord['errorTimestamp'] =
+            DateTime.now().millisecondsSinceEpoch.toString();
+
+        // Tạo một key duy nhất cho mỗi bản ghi mà không ghi dữ liệu
+        String? uniqueKey = recordsRef.push().key;
+        if (uniqueKey != null) {
+          recordsMap[uniqueKey] = errorRecord;
+        }
+      }
+
+      // Chuẩn bị toàn bộ payload để ghi một lần
+      Map<String, dynamic> finalPayload = {
+        'metadata': {
+          'totalErrorRecords': errorCCCDList.length,
+          'syncTimestamp': DateTime.now().millisecondsSinceEpoch.toString(),
+          'syncDate': DateTime.now().toIso8601String(),
+        },
+        // Thêm tất cả các bản ghi lỗi đã chuẩn bị
+        'records': recordsMap,
+      };
+
+      // Thực hiện ghi toàn bộ dữ liệu lên node 'errorcccd' trong một thao tác duy nhất
+      await FirebaseManager().rootPath.child('errorcccd').set(finalPayload);
+
+      Get.snackbar(
+        "Thành công",
+        "Đã đồng bộ ${errorCCCDList.length} bản ghi lỗi lên Firebase",
+        backgroundColor: Colors.green,
+        colorText: Colors.white,
+      );
+    } catch (e) {
+      Get.snackbar(
+        "Lỗi",
+        "Không thể đồng bộ dữ liệu lên Firebase: $e",
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
+  }
+
+  /// Copy all error CCCD data to clipboard (legacy method)
   void copyAllErrorCCCDData() {
     if (errorCCCDList.isEmpty) {
       Get.snackbar("Thông báo", "Không có dữ liệu lỗi để copy");
@@ -38,6 +96,46 @@ class CccdErrorController extends GetxController {
         "Đã copy ${errorCCCDList.length} bản ghi lỗi vào clipboard");
   }
 
+  /// Check Firebase error records status
+  Future<void> checkFirebaseErrorStatus() async {
+    try {
+      final snapshot = await FirebaseManager()
+          .rootPath
+          .child('errorcccd')
+          .child('metadata')
+          .get();
+
+      if (snapshot.exists) {
+        Map<dynamic, dynamic> metadata =
+            snapshot.value as Map<dynamic, dynamic>;
+        String syncDate = metadata['syncDate'] ?? 'Unknown';
+        int totalRecords = metadata['totalErrorRecords'] ?? 0;
+
+        Get.snackbar(
+          "Firebase Status",
+          "Có $totalRecords bản ghi lỗi trên Firebase\nĐồng bộ lần cuối: ${syncDate.substring(0, 19)}",
+          backgroundColor: Colors.blue,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 4),
+        );
+      } else {
+        Get.snackbar(
+          "Firebase Status",
+          "Không có dữ liệu lỗi nào trên Firebase",
+          backgroundColor: Colors.grey,
+          colorText: Colors.white,
+        );
+      }
+    } catch (e) {
+      Get.snackbar(
+        "Lỗi",
+        "Không thể kiểm tra trạng thái Firebase: $e",
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    }
+  }
+
   /// Remove a CCCD from error list
   void removeErrorCCCD(int index) {
     if (index >= 0 && index < errorCCCDList.length) {
@@ -48,7 +146,7 @@ class CccdErrorController extends GetxController {
     }
   }
 
-  /// Clear all error CCCDs
+  /// Clear all error CCCDs from local list and Firebase
   void clearAllErrorCCCDs() {
     if (errorCCCDList.isEmpty) {
       Get.snackbar("Thông báo", "Danh sách lỗi đã trống");
@@ -59,104 +157,41 @@ class CccdErrorController extends GetxController {
       AlertDialog(
         title: const Text('Xác nhận'),
         content: Text(
-            'Bạn có chắc muốn xóa tất cả ${errorCCCDList.length} CCCD lỗi?'),
+            'Bạn có chắc muốn xóa tất cả ${errorCCCDList.length} CCCD lỗi?\nDữ liệu sẽ được xóa cả trên thiết bị và Firebase.'),
         actions: [
           TextButton(
             onPressed: () => Get.back(),
             child: const Text('Hủy'),
           ),
           TextButton(
-            onPressed: () {
-              errorCCCDList.clear();
-              Get.back();
-              Get.snackbar("Thành công", "Đã xóa tất cả CCCD lỗi");
+            onPressed: () async {
+              try {
+                // Clear from Firebase first
+                await FirebaseManager().rootPath.child('errorcccd').remove();
+
+                // Clear local list
+                errorCCCDList.clear();
+
+                Get.back();
+                Get.snackbar(
+                  "Thành công",
+                  "Đã xóa tất cả CCCD lỗi khỏi thiết bị và Firebase",
+                  backgroundColor: Colors.green,
+                  colorText: Colors.white,
+                );
+              } catch (e) {
+                // If Firebase fails, still clear local list
+                errorCCCDList.clear();
+                Get.back();
+                Get.snackbar(
+                  "Cảnh báo",
+                  "Đã xóa dữ liệu cục bộ nhưng có lỗi khi xóa Firebase: $e",
+                  backgroundColor: Colors.orange,
+                  colorText: Colors.white,
+                );
+              }
             },
             child: const Text('Xóa'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Get Downloads directory with Android version compatibility
-  Future<Directory?> _getDownloadsDirectory() async {
-    try {
-      if (Platform.isAndroid) {
-        // For Android 10+ (API 29+), try to get Downloads directory
-        // Note: getDownloadsDirectory() is available but may require special handling
-
-        // Try to get external storage directory and navigate to Downloads
-        final externalDir = await getExternalStorageDirectory();
-        if (externalDir != null) {
-          // Navigate to Downloads folder: /storage/emulated/0/Download
-          const downloadsPath = '/storage/emulated/0/Download';
-          final downloadsDir = Directory(downloadsPath);
-
-          // Check if Downloads directory exists and is writable
-          if (await downloadsDir.exists()) {
-            // Test write permission by creating a temporary file
-            try {
-              final testFile = File(
-                  '${downloadsDir.path}/.test_write_${DateTime.now().millisecondsSinceEpoch}');
-              await testFile.writeAsString('test');
-              await testFile.delete();
-              return downloadsDir;
-            } catch (e) {
-              // No write permission to Downloads folder
-              return null;
-            }
-          }
-        }
-
-        // Fallback: try getDownloadsDirectory() if available
-        try {
-          return await getDownloadsDirectory();
-        } catch (e) {
-          // getDownloadsDirectory() not available or failed
-          return null;
-        }
-      }
-
-      // For non-Android platforms, try getDownloadsDirectory()
-      return await getDownloadsDirectory();
-    } catch (e) {
-      // All Downloads directory attempts failed
-      return null;
-    }
-  }
-
-  /// Show information dialog about file location and access
-  void showFileLocationInfo() {
-    Get.dialog(
-      AlertDialog(
-        title: const Text('Thông tin file Excel'),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('File Excel được lưu tại (theo thứ tự ưu tiên):'),
-            SizedBox(height: 8),
-            Text('1. Thư mục Downloads: /storage/emulated/0/Download/'),
-            Text('2. Bộ nhớ ngoài: /Android/data/[app]/files/'),
-            Text('3. Thư mục ứng dụng: /data/data/[app]/app_flutter/'),
-            SizedBox(height: 12),
-            Text('Để truy cập file:'),
-            SizedBox(height: 8),
-            Text('• Downloads: Mở ứng dụng "Downloads" hoặc "Files"'),
-            Text(
-                '• Bộ nhớ ngoài: Dùng file manager → Android/data/[app]/files/'),
-            Text('• Thư mục ứng dụng: Dùng file manager với quyền root'),
-            SizedBox(height: 12),
-            Text('Mở file .xlsx bằng Excel, Google Sheets, hoặc WPS Office'),
-            SizedBox(height: 8),
-            Text(
-                'Lưu ý: Ứng dụng sẽ tự động chọn vị trí tốt nhất dựa trên quyền truy cập và phiên bản Android.'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Get.back(),
-            child: const Text('Đóng'),
           ),
         ],
       ),

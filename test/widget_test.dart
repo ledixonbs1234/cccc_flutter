@@ -113,7 +113,7 @@ void main() {
       // Test 1: "Ngoc" should find "Ngọc"
       int foundIndex1 = controller.totalCCCD.indexWhere((item) {
         String normalizedName =
-            controller.removeDiacritics(item.Name.toLowerCase());
+            controller.chuyenSangKoDau(item.Name.toLowerCase());
         return normalizedName.contains('ngoc');
       });
       expect(foundIndex1, equals(0)); // Should find "Dương Lê Như Ngọc"
@@ -121,7 +121,7 @@ void main() {
       // Test 2: "Duong" should find "Dương"
       int foundIndex2 = controller.totalCCCD.indexWhere((item) {
         String normalizedName =
-            controller.removeDiacritics(item.Name.toLowerCase());
+            controller.chuyenSangKoDau(item.Name.toLowerCase());
         return normalizedName.contains('duong');
       });
       expect(foundIndex2, equals(0)); // Should find "Dương Lê Như Ngọc"
@@ -129,7 +129,7 @@ void main() {
       // Test 3: "Hung" should find "Hùng"
       int foundIndex3 = controller.totalCCCD.indexWhere((item) {
         String normalizedName =
-            controller.removeDiacritics(item.Name.toLowerCase());
+            controller.chuyenSangKoDau(item.Name.toLowerCase());
         return normalizedName.contains('hung');
       });
       expect(foundIndex3, equals(1)); // Should find "Nguyễn Văn Hùng"
@@ -137,7 +137,7 @@ void main() {
       // Test 4: "Duc" should find "Đức"
       int foundIndex4 = controller.totalCCCD.indexWhere((item) {
         String normalizedName =
-            controller.removeDiacritics(item.Name.toLowerCase());
+            controller.chuyenSangKoDau(item.Name.toLowerCase());
         return normalizedName.contains('duc');
       });
       expect(foundIndex4, equals(3)); // Should find "Lê Minh Đức"
@@ -199,7 +199,7 @@ void main() {
       for (var entry in testCases.entries) {
         String input = entry.key;
         String expected = entry.value;
-        String actual = controller.removeDiacritics(input);
+        String actual = controller.chuyenSangKoDau(input);
 
         expect(actual, equals(expected),
             reason:

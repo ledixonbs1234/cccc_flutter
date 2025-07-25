@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:assets_audio_player/assets_audio_player.dart';
+import 'package:diacritic/diacritic.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flutter/services.dart';
@@ -33,6 +34,7 @@ class HomeController extends GetxController {
     postalCodeController.addListener(() {
       currentPostalCode.value = postalCodeController.text;
     });
+    totalCCCD.addAll(generateSampleCCCDData());
   }
 
   String formatDateString(String inputDate) {
@@ -338,34 +340,8 @@ class HomeController extends GetxController {
   }
 
   /// Removes Vietnamese diacritics from text for search comparison
-  String removeDiacritics(String text) {
-    // Define regex patterns for each Vietnamese vowel group and đ
-    final replacements = [
-      // Lowercase vowels
-      {'pattern': r'[àáạảãâầấậẩẫăằắặẳẵ]', 'replacement': 'a'},
-      {'pattern': r'[èéẹẻẽêềếệểễ]', 'replacement': 'e'},
-      {'pattern': r'[ìíịỉĩ]', 'replacement': 'i'},
-      {'pattern': r'[òóọỏõôồốộổỗơờớợởỡ]', 'replacement': 'o'},
-      {'pattern': r'[ùúụủũưừứựửữ]', 'replacement': 'u'},
-      {'pattern': r'[ỳýỵỷỹ]', 'replacement': 'y'},
-      {'pattern': r'đ', 'replacement': 'd'},
-
-      // Uppercase vowels
-      {'pattern': r'[ÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴ]', 'replacement': 'A'},
-      {'pattern': r'[ÈÉẸẺẼÊỀẾỆỂỄ]', 'replacement': 'E'},
-      {'pattern': r'[ÌÍỊỈĨ]', 'replacement': 'I'},
-      {'pattern': r'[ÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠ]', 'replacement': 'O'},
-      {'pattern': r'[ÙÚỤỦŨƯỪỨỰỬỮ]', 'replacement': 'U'},
-      {'pattern': r'[ỲÝỴỶỸ]', 'replacement': 'Y'},
-      {'pattern': r'Đ', 'replacement': 'D'},
-    ];
-
-    String result = text;
-    for (var replacement in replacements) {
-      result = result.replaceAll(
-          RegExp(replacement['pattern']!), replacement['replacement']!);
-    }
-    return result;
+  String chuyenSangKoDau(String text) {
+    return removeDiacritics(text);
   }
 
   void searchCCCD(String value) {
@@ -375,11 +351,11 @@ class HomeController extends GetxController {
     }
 
     // Normalize search value by removing diacritics and converting to lowercase
-    String normalizedSearchValue = removeDiacritics(value.trim().toLowerCase());
+    String normalizedSearchValue = chuyenSangKoDau(value.trim().toLowerCase());
 
     // Find the first matching CCCD by comparing normalized names
     int index = totalCCCD.indexWhere((item) {
-      String normalizedName = removeDiacritics(item.Name.toLowerCase());
+      String normalizedName = chuyenSangKoDau(item.Name.toLowerCase());
       return normalizedName.contains(normalizedSearchValue);
     });
 
@@ -408,21 +384,72 @@ class HomeController extends GetxController {
     }
   }
 
-  // Method để copy tất cả dữ liệu CCCD theo format yêu cầu
-  void copyAllCCCDData() {
-    if (totalCCCD.isEmpty) {
-      Get.snackbar("Thông báo", "Không có dữ liệu để copy");
-      return;
+  //tạo hàm danh sách cccd mẫu để test từ cccdInfo bao gồm khoảng 10 cccd có Name ngẫu nhiên khác nhau
+  List<CCCDInfo> generateSampleCCCDData() {
+    List<CCCDInfo> sampleData = [];
+
+    // Danh sách tên Việt Nam ngẫu nhiên
+    List<String> sampleNames = [
+      'Nguyễn Văn Hùng',
+      'Trần Thị Hạnh',
+      'Lê Minh Đức',
+      'Phạm Thị Hương',
+      'Hoàng Văn Tuấn',
+      'Dương Lê Như Ngọc',
+      'Võ Thị Mai',
+      'Bùi Văn Thành',
+      'Đặng Thị Lan',
+      'Phan Minh Khôi'
+    ];
+
+    // Danh sách ngày sinh ngẫu nhiên
+    List<String> sampleBirthDates = [
+      '15/05/1990',
+      '08/03/1985',
+      '22/12/1992',
+      '10/07/1988',
+      '03/09/1995',
+      '20/11/2021',
+      '14/02/1987',
+      '30/06/1993',
+      '25/04/1989',
+      '18/01/1991'
+    ];
+
+    // Danh sách địa chỉ mẫu
+    List<String> sampleAddresses = [
+      'Tổ 7, Khu Phố Thiện Đức Bắc, Hoài Hương, Hoài Nhơn, Bình Định',
+      'Khu Phố 6 Bồng Sơn, An Khê, Gia Lai',
+      'Diễn Khánh Hoài Đức, Hà Nội',
+      'Phường 1, Quận 3, TP. Hồ Chí Minh',
+      'Xã Tân Phú, Huyện Đức Trọng, Lâm Đồng',
+      'Phường Hải Châu, Quận Hải Châu, Đà Nẵng',
+      'Xã Phú Hòa, Huyện Krông Pắc, Đắk Lắk',
+      'Phường Nguyễn Du, TP. Huế, Thừa Thiên Huế',
+      'Xã Ea Kar, Huyện Ea Kar, Đắk Lắk',
+      'Phường Tân An, TP. Buôn Ma Thuột, Đắk Lắk'
+    ];
+
+    // Danh sách giới tính
+    List<String> genders = ['Nam', 'Nữ'];
+
+    for (int i = 0; i < 10; i++) {
+      // Tạo số CCCD ngẫu nhiên (12 chữ số)
+      String cccdId =
+          '052${(321000000 + i * 1000 + (i * 123) % 1000).toString().padLeft(9, '0')}';
+
+      CCCDInfo cccdInfo = CCCDInfo(sampleNames[i], sampleBirthDates[i], cccdId);
+
+      // Thêm thông tin bổ sung
+      cccdInfo.gioiTinh = genders[i % 2];
+      cccdInfo.DiaChi = sampleAddresses[i];
+      cccdInfo.NgayLamCCCD = '06/11/2024';
+      cccdInfo.maBuuGui = 'BĐ${(590000 + i * 10).toString()}';
+
+      sampleData.add(cccdInfo);
     }
 
-    StringBuffer buffer = StringBuffer();
-    for (int i = 0; i < totalCCCD.length; i++) {
-      buffer.writeln(totalCCCD[i].toCopyFormat(i + 1));
-    }
-
-    Clipboard.setData(ClipboardData(text: buffer.toString()));
-    Get.snackbar(
-        "Thành công", "Đã copy ${totalCCCD.length} bản ghi vào clipboard");
+    return sampleData;
   }
 
   /// Add current CCCD to error list and advance to next CCCD
@@ -455,7 +482,8 @@ class HomeController extends GetxController {
       nameCurrent.value = totalCCCD[indexCurrent.value].Name;
 
       // Continue processing if auto-run is enabled
-      if (isAutoRun.value && !isSending) {
+      if (isAutoRun.value) {
+        isSending = false;
         processCCCD();
       }
     } else {
