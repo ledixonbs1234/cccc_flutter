@@ -329,6 +329,10 @@ class HomeController extends GetxController {
   }
 
   void onListenNotification(MessageReceiveModel message) {
+    // Debug logging for message received (remove in production)
+    print(
+        "Firebase message received - Lenh: ${message.Lenh}, DoiTuong: ${message.DoiTuong}");
+
     if (message.Lenh == "continueCCCD") {
       isSending = false;
       if (isAutoRun.value) {
@@ -336,7 +340,46 @@ class HomeController extends GetxController {
         // Sau khi nhận được tín hiệu hoàn thành và tăng index, gọi lại processCCCD để xử lý mục tiếp theo
         processCCCD();
       }
+    } else if (message.Lenh == "sendMaHieu") {
+      // Handle postal code update from TypeScript function
+      String receivedPostalCode = message.DoiTuong.trim();
+      print(
+          "Processing sendMaHieu command with postal code: '$receivedPostalCode'");
+
+      if (receivedPostalCode.isNotEmpty) {
+        // Update the postal code controller and reactive variable
+        postalCodeController.text = receivedPostalCode;
+        currentPostalCode.value = receivedPostalCode;
+
+        print("Postal code updated successfully: $receivedPostalCode");
+
+        // Show notification to user
+        Get.snackbar(
+          "Mã hiệu đã cập nhật",
+          "Đã nhận mã hiệu: $receivedPostalCode",
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 2),
+        );
+      } else {
+        print("Warning: Received empty postal code");
+        Get.snackbar(
+          "Cảnh báo",
+          "Mã hiệu nhận được rỗng",
+          backgroundColor: Colors.orange,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 2),
+        );
+      }
     }
+  }
+
+  /// Test function to simulate receiving postal code from TypeScript
+  /// This can be called manually to test the functionality
+  void testPostalCodeReceive(String testPostalCode) {
+    MessageReceiveModel testMessage =
+        MessageReceiveModel("sendMaHieu", testPostalCode);
+    onListenNotification(testMessage);
   }
 
   /// Removes Vietnamese diacritics from text for search comparison
