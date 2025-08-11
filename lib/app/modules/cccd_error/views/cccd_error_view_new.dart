@@ -76,7 +76,7 @@ class CccdErrorView extends GetView<CccdErrorController> {
               ],
             ),
 
-            const SizedBox(height: 8.0),
+            const SizedBox(height: 16.0),
 
             // Additional Action Buttons Row
             Row(
@@ -109,7 +109,7 @@ class CccdErrorView extends GetView<CccdErrorController> {
               ],
             ),
 
-            const SizedBox(height: 8.0),
+            const SizedBox(height: 16.0),
 
             // Auto Sync Toggle Row
             Row(
@@ -148,7 +148,7 @@ class CccdErrorView extends GetView<CccdErrorController> {
               ],
             ),
 
-            const SizedBox(height: 8.0),
+            const SizedBox(height: 16.0),
 
             // Third Action Buttons Row - Firebase Status
             Row(
@@ -181,7 +181,7 @@ class CccdErrorView extends GetView<CccdErrorController> {
               ],
             ),
 
-            const SizedBox(height: 8.0),
+            const SizedBox(height: 16.0),
 
             // Status Card
             Obx(

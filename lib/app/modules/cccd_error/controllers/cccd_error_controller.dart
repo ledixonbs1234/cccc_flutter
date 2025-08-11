@@ -8,14 +8,30 @@ import '../../../managers/fireabaseManager.dart';
 class CccdErrorController extends GetxController {
   final errorCCCDList = <CCCDInfo>[].obs;
   final isExporting = false.obs;
+  final totalCCCDList = <CCCDInfo>[].obs;
+  final currentIndex = 0.obs;
+  final autoSyncEnabled = true.obs; // Auto sync setting
 
   @override
   void onInit() {
     super.onInit();
-    // Get error CCCD list from arguments if passed
-    if (Get.arguments != null && Get.arguments is List<CCCDInfo>) {
+    // Get error CCCD list and additional info from arguments if passed
+    if (Get.arguments != null && Get.arguments is Map<String, dynamic>) {
+      final args = Get.arguments as Map<String, dynamic>;
+      errorCCCDList.value = (args['errorList'] as List<CCCDInfo>?) ?? [];
+      totalCCCDList.value = (args['totalList'] as List<CCCDInfo>?) ?? [];
+      currentIndex.value = (args['currentIndex'] as int?) ?? 0;
+    } else if (Get.arguments != null && Get.arguments is List<CCCDInfo>) {
+      // Backward compatibility
       errorCCCDList.value = Get.arguments as List<CCCDInfo>;
     }
+
+    // Listen to changes in errorCCCDList and auto sync if enabled
+    ever(errorCCCDList, (_) {
+      if (autoSyncEnabled.value) {
+        _autoSyncToFirebase();
+      }
+    });
   }
 
   /// Sync all error CCCD data to Firebase Realtime Database
@@ -77,6 +93,81 @@ class CccdErrorController extends GetxController {
         colorText: Colors.white,
       );
     }
+  }
+
+  /// Auto sync error CCCDs to Firebase in background
+  Future<void> _autoSyncToFirebase() async {
+    if (errorCCCDList.isEmpty) {
+      // Clear Firebase data if local list is empty
+      try {
+        await FirebaseManager().rootPath.child('errorcccd').remove();
+      } catch (e) {
+        // Ignore errors when clearing empty data
+      }
+      return;
+    }
+
+    try {
+      // Prepare data for sync
+      Map<String, dynamic> recordsMap = {};
+      final recordsRef =
+          FirebaseManager().rootPath.child('errorcccd').child('records');
+
+      for (int i = 0; i < errorCCCDList.length; i++) {
+        CCCDInfo errorCCCD = errorCCCDList[i];
+
+        Map<String, dynamic> errorRecord =
+            Map<String, dynamic>.from(errorCCCD.toJsonFull());
+        errorRecord['errorIndex'] = i + 1;
+        errorRecord['errorTimestamp'] =
+            DateTime.now().millisecondsSinceEpoch.toString();
+        
+        // Add position in total list if available
+        if (totalCCCDList.isNotEmpty) {
+          int position = getPositionInTotalList(errorCCCD);
+          if (position > 0) {
+            errorRecord['positionInTotalList'] = position;
+            errorRecord['totalListCount'] = getTotalCCCDCount();
+          }
+        }
+
+        // Create unique key for each record
+        String? uniqueKey = recordsRef.push().key;
+        if (uniqueKey != null) {
+          recordsMap[uniqueKey] = errorRecord;
+        }
+      }
+
+      // Prepare final payload
+      Map<String, dynamic> finalPayload = {
+        'metadata': {
+          'totalErrorRecords': errorCCCDList.length,
+          'syncTimestamp': DateTime.now().millisecondsSinceEpoch.toString(),
+          'syncDate': DateTime.now().toIso8601String(),
+          'autoSync': true,
+        },
+        'records': recordsMap,
+      };
+
+      // Sync to Firebase
+      await FirebaseManager().rootPath.child('errorcccd').set(finalPayload);
+    } catch (e) {
+      // Silent fail for auto sync to avoid interrupting user experience
+      print('Auto sync to Firebase failed: $e');
+    }
+  }
+
+  /// Toggle auto sync functionality
+  void toggleAutoSync() {
+    autoSyncEnabled.value = !autoSyncEnabled.value;
+    Get.snackbar(
+      "Thông báo",
+      autoSyncEnabled.value
+          ? "Đã bật tự động đồng bộ Firebase"
+          : "Đã tắt tự động đồng bộ Firebase",
+      backgroundColor: autoSyncEnabled.value ? Colors.green : Colors.orange,
+      colorText: Colors.white,
+    );
   }
 
   /// Copy all error CCCD data to clipboard (legacy method)
@@ -144,6 +235,19 @@ class CccdErrorController extends GetxController {
       Get.snackbar(
           "Thông báo", "Đã xóa ${removedCCCD.Name} khỏi danh sách lỗi");
     }
+  }
+
+  /// Get the position of a CCCD in the total list (1-based index)
+  int getPositionInTotalList(CCCDInfo cccd) {
+    if (totalCCCDList.isEmpty) return -1;
+
+    int position = totalCCCDList.indexWhere((item) => item.Id == cccd.Id);
+    return position != -1 ? position + 1 : -1;
+  }
+
+  /// Get total count of CCCDs in the main list
+  int getTotalCCCDCount() {
+    return totalCCCDList.length;
   }
 
   /// Clear all error CCCDs from local list and Firebase

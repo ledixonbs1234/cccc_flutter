@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 
 import '../controllers/home_controller.dart';
-import '../models/cccdInfo.dart';
 
 class HomeView extends GetView<HomeController> {
   const HomeView({Key? key}) : super(key: key);
@@ -206,6 +205,22 @@ class HomeView extends GetView<HomeController> {
                     ),
                   ),
                 ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      controller.scanPostalCode();
+                    },
+                    icon: const Icon(Icons.qr_code_scanner),
+                    label: const Text('Quét mã hiệu'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 12),
@@ -230,6 +245,55 @@ class HomeView extends GetView<HomeController> {
                 ),
               ],
             ),
+
+            const SizedBox(height: 16),
+
+            // Error management buttons row
+            Obx(() => Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: controller.isAutoRun.value
+                        ? () {
+                            controller.addCurrentCCCDToError();
+                          }
+                        : null,
+                    icon: const Icon(Icons.error_outline),
+                    label: const Text('CCCD Lỗi'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: controller.isAutoRun.value
+                          ? colorScheme.error
+                          : colorScheme.surfaceContainerHighest,
+                      foregroundColor: controller.isAutoRun.value
+                          ? colorScheme.onError
+                          : colorScheme.onSurfaceVariant,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      controller.navigateToCCCDErrorPage();
+                    },
+                    icon: const Icon(Icons.list_alt),
+                    label: Text('Xem Lỗi (${controller.errorCCCDList.length})'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: colorScheme.tertiary,
+                      side: BorderSide(color: colorScheme.tertiary),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            )),
           ],
         ),
       ),
@@ -296,11 +360,11 @@ class HomeView extends GetView<HomeController> {
                       const SizedBox(height: 12),
                       _buildStatusRow(
                         context,
-                        controller.isRunning.value
-                            ? Icons.play_circle
+                        controller.isAutoRun.value
+                            ? Icons.autorenew
                             : Icons.pause_circle,
-                        'Trạng thái',
-                        controller.isRunning.value ? 'Đang chạy' : 'Tạm dừng',
+                        'Chế độ',
+                        controller.isAutoRun.value ? 'Tự động' : 'Thủ công',
                         colorScheme,
                       ),
                     ],
@@ -309,24 +373,52 @@ class HomeView extends GetView<HomeController> {
 
                 const SizedBox(height: 20),
 
-                // Control Switches
+                // Control Actions
                 Row(
                   children: [
                     Expanded(
-                      child: _buildSwitchTile(
-                        context,
-                        'Gửi',
-                        Icons.send,
-                        controller.isRunning.value,
-                        (value) {
-                          controller.isRunning.value = value;
-                          if (value && controller.totalCCCD.isNotEmpty) {
-                            controller.sendCCCD(controller
-                                .totalCCCD[controller.indexCurrent.value]);
-                          }
-                        },
-                        colorScheme,
-                      ),
+                      child: Obx(() => FilledButton.icon(
+                            onPressed: controller.totalCCCD.isNotEmpty
+                                ? () {
+                                    // Send CCCD at current position
+                                    if (controller.indexCurrent.value <
+                                        controller.totalCCCD.length) {
+                                      controller.sendCCCD(controller.totalCCCD[
+                                          controller.indexCurrent.value]);
+
+                                      // Show success feedback
+                                      Get.snackbar(
+                                        "Đã gửi",
+                                        "Đã gửi CCCD: ${controller.totalCCCD[controller.indexCurrent.value].Name}",
+                                        duration: const Duration(seconds: 2),
+                                        snackPosition: SnackPosition.BOTTOM,
+                                        backgroundColor:
+                                            colorScheme.primaryContainer,
+                                        colorText:
+                                            colorScheme.onPrimaryContainer,
+                                        icon: Icon(
+                                          Icons.check_circle,
+                                          color: colorScheme.onPrimaryContainer,
+                                        ),
+                                      );
+                                    }
+                                  }
+                                : null, // Disabled when no CCCDs available
+                            icon: const Icon(Icons.send),
+                            label: const Text('Gửi'),
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              backgroundColor: controller.totalCCCD.isNotEmpty
+                                  ? colorScheme.primary
+                                  : colorScheme.surfaceContainerHighest,
+                              foregroundColor: controller.totalCCCD.isNotEmpty
+                                  ? colorScheme.onPrimary
+                                  : colorScheme.onSurfaceVariant,
+                            ),
+                          )),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
@@ -473,85 +565,242 @@ class HomeView extends GetView<HomeController> {
   // Helper method to build search section
   Widget _buildSearchSection(BuildContext context, ColorScheme colorScheme) {
     return Card(
-      elevation: 2,
-      shadowColor: colorScheme.shadow.withOpacity(0.1),
+      elevation: 4, // Increased elevation for more prominence
+      shadowColor: colorScheme.primary
+          .withOpacity(0.2), // Primary color shadow for attention
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.search_outlined,
-                  color: colorScheme.primary,
-                  size: 24,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              colorScheme.primaryContainer.withOpacity(0.1),
+              colorScheme.surface,
+            ],
+          ),
+        ),
+        child: Padding(
+          padding:
+              const EdgeInsets.all(24.0), // Increased padding for more space
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.search_outlined,
+                      color: colorScheme.primary,
+                      size: 28, // Larger icon for prominence
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Tìm kiếm CCCD',
+                          style:
+                              Theme.of(context).textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: colorScheme.onSurface,
+                                  ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Tìm nhanh theo tên hoặc số CCCD',
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: colorScheme.primary.withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Text(
-                  'Tìm kiếm CCCD',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: colorScheme.onSurface,
+                child: TextField(
+                  controller: controller.searchController,
+                  onChanged: (value) {
+                    controller.searchCCCD(value);
+                  },
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w500,
                       ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: controller.searchController,
-                    onChanged: (value) {
-                      controller.searchCCCD(value);
-                    },
-                    decoration: InputDecoration(
-                      labelText: 'Nhập tên hoặc ID để tìm kiếm',
-                      hintText: 'VD: Nguyễn Văn A hoặc 052321010762',
-                      prefixIcon: Icon(
+                  decoration: InputDecoration(
+                    labelText: 'Nhập tên hoặc ID để tìm kiếm',
+                    labelStyle: TextStyle(
+                      color: colorScheme.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    hintText: 'VD: Nguyễn Văn A hoặc 052321010762',
+                    hintStyle: TextStyle(
+                      color: colorScheme.onSurfaceVariant.withOpacity(0.7),
+                      fontStyle: FontStyle.italic,
+                    ),
+                    prefixIcon: Container(
+                      margin: const EdgeInsets.all(8),
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
                         Icons.search,
                         color: colorScheme.primary,
+                        size: 24,
                       ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: colorScheme.outline),
+                    ),
+                    suffixIcon: Obx(() => controller.hasSearchText.value
+                        ? IconButton(
+                            onPressed: () {
+                              controller.clearSearch();
+                            },
+                            icon: Icon(
+                              Icons.clear_rounded,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                            tooltip: 'Xóa tìm kiếm',
+                          )
+                        : Icon(
+                            Icons.keyboard_arrow_right_rounded,
+                            color:
+                                colorScheme.onSurfaceVariant.withOpacity(0.5),
+                          )),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(
+                        color: colorScheme.primary.withOpacity(0.3),
+                        width: 2,
                       ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: colorScheme.outline),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(
+                        color: colorScheme.primary.withOpacity(0.3),
+                        width: 2,
                       ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide:
-                            BorderSide(color: colorScheme.primary, width: 2),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(
+                        color: colorScheme.primary,
+                        width: 3,
                       ),
-                      filled: true,
-                      fillColor: colorScheme.surface,
+                    ),
+                    filled: true,
+                    fillColor: colorScheme.surface,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 20, // Increased vertical padding for height
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Obx(() => controller.isSearchActive.value
-                    ? IconButton(
-                        onPressed: () {
-                          controller.clearSearch();
-                        },
-                        icon: Icon(
-                          Icons.clear,
-                          color: colorScheme.error,
+              ),
+
+              // Search status indicator
+              const SizedBox(height: 16),
+              Obx(() => controller.isSearchActive.value
+                  ? Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primaryContainer.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: colorScheme.primary.withOpacity(0.3),
                         ),
-                        tooltip: 'Xóa tìm kiếm',
-                        style: IconButton.styleFrom(
-                          backgroundColor: colorScheme.errorContainer,
-                          foregroundColor: colorScheme.onErrorContainer,
-                        ),
-                      )
-                    : const SizedBox.shrink()),
-              ],
-            ),
-          ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.search_rounded,
+                            size: 16,
+                            color: colorScheme.primary,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Đang tìm: "${controller.searchQuery.value}"',
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: colorScheme.primary,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: colorScheme.primary,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              '${controller.searchResults.length}',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: colorScheme.onPrimary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceContainerHighest
+                            .withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.info_outline_rounded,
+                            size: 16,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Nhập để tìm kiếm trong ${controller.totalCCCD.length} CCCD',
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: colorScheme.onSurfaceVariant,
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                          ),
+                        ],
+                      ),
+                    )),
+            ],
+          ),
         ),
       ),
     );
@@ -585,49 +834,6 @@ class HomeView extends GetView<HomeController> {
                             fontWeight: FontWeight.w600,
                             color: colorScheme.onSurface,
                           ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-
-                // Error management buttons
-                Row(
-                  children: [
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: () {
-                          controller.addCurrentCCCDToError();
-                        },
-                        icon: const Icon(Icons.error_outline),
-                        label: const Text('CCCD Lỗi'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: colorScheme.error,
-                          foregroundColor: colorScheme.onError,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          controller.navigateToCCCDErrorPage();
-                        },
-                        icon: const Icon(Icons.list_alt),
-                        label: Text(
-                            'Xem Lỗi (${controller.errorCCCDList.length})'),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: colorScheme.tertiary,
-                          side: BorderSide(color: colorScheme.tertiary),
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
                     ),
                   ],
                 ),

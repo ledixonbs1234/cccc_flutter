@@ -36,6 +36,7 @@ class HomeController extends GetxController {
   final searchResults = <CCCDInfo>[].obs;
   final searchQuery = "".obs;
   final isSearchActive = false.obs;
+  final hasSearchText = false.obs;
 
   @override
   void onInit() {
@@ -147,6 +148,73 @@ class HomeController extends GetxController {
       });
     } on PlatformException {
       Get.snackbar("Thông báo", "Lỗi barcode");
+    }
+
+    update();
+  }
+
+  /// Scan postal code using camera or QR code scanner
+  void scanPostalCode() {
+    try {
+      // Use barcode scanner to scan postal code
+      FlutterBarcodeScanner.scanBarcode(
+        "#ff6666", // Scanner line color
+        "Hủy", // Cancel button text
+        true, // Show flash icon
+        ScanMode.DEFAULT, // Scan mode
+      ).then((scannedCode) {
+        if (scannedCode != '-1' && scannedCode.isNotEmpty) {
+          // Process the scanned postal code
+          String cleanedCode = scannedCode.trim().toUpperCase();
+
+          // Update postal code controller and reactive variable
+          postalCodeController.text = cleanedCode;
+          currentPostalCode.value = cleanedCode;
+
+          // Show success feedback
+          Get.snackbar(
+            "Quét thành công",
+            "Đã quét mã bưu gửi: $cleanedCode",
+            duration: const Duration(seconds: 3),
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Get.theme.colorScheme.primaryContainer,
+            colorText: Get.theme.colorScheme.onPrimaryContainer,
+            icon: Icon(
+              Icons.check_circle,
+              color: Get.theme.colorScheme.onPrimaryContainer,
+            ),
+          );
+
+          // Play success sound
+          AssetsAudioPlayer.newPlayer().open(
+            Audio("assets/beep.mp3"),
+          );
+        } else {
+          // Show cancellation or error message
+          Get.snackbar(
+            "Quét bị hủy",
+            "Việc quét mã bưu gửi đã bị hủy",
+            duration: const Duration(seconds: 2),
+            snackPosition: SnackPosition.BOTTOM,
+            backgroundColor: Get.theme.colorScheme.errorContainer,
+            colorText: Get.theme.colorScheme.onErrorContainer,
+          );
+        }
+      });
+    } on PlatformException catch (e) {
+      // Handle scanning errors
+      Get.snackbar(
+        "Lỗi quét mã",
+        "Không thể quét mã bưu gửi: ${e.message}",
+        duration: const Duration(seconds: 3),
+        snackPosition: SnackPosition.BOTTOM,
+        backgroundColor: Get.theme.colorScheme.errorContainer,
+        colorText: Get.theme.colorScheme.onErrorContainer,
+        icon: Icon(
+          Icons.error,
+          color: Get.theme.colorScheme.onErrorContainer,
+        ),
+      );
     }
 
     update();
@@ -432,6 +500,9 @@ class HomeController extends GetxController {
   }
 
   void searchCCCD(String value) {
+    // Update hasSearchText reactive variable
+    hasSearchText.value = value.trim().isNotEmpty;
+
     // Clear previous search results if search is empty
     if (value.trim().isEmpty) {
       clearSearch();
@@ -469,6 +540,7 @@ class HomeController extends GetxController {
     searchResults.clear();
     searchQuery.value = "";
     isSearchActive.value = false;
+    hasSearchText.value = false;
     // Clear the search text field
     searchController.clear();
   }
@@ -714,6 +786,9 @@ class HomeController extends GetxController {
         errorCCCDList.add(currentCCCD);
         Get.snackbar(
             "Thông báo", "Đã thêm ${currentCCCD.Name} vào danh sách lỗi");
+        
+        // Auto sync to Firebase
+        _autoSyncErrorToFirebase();
       }
 
       // Advance to next CCCD
@@ -740,7 +815,11 @@ class HomeController extends GetxController {
 
   /// Navigate to CCCD Error page
   void navigateToCCCDErrorPage() {
-    Get.toNamed('/cccd_error', arguments: errorCCCDList.toList());
+    Get.toNamed('/cccd_error', arguments: {
+      'errorList': errorCCCDList.toList(),
+      'totalList': totalCCCD.toList(),
+      'currentIndex': indexCurrent.value,
+    });
   }
 
   /// Update postal code for all future scanned CCCDs
@@ -792,5 +871,66 @@ class HomeController extends GetxController {
         ],
       ),
     );
+  }
+
+  /// Auto sync error CCCD list to Firebase in background
+  Future<void> _autoSyncErrorToFirebase() async {
+    if (errorCCCDList.isEmpty) {
+      // Clear Firebase data if local list is empty
+      try {
+        await FirebaseManager().rootPath.child('errorcccd').remove();
+      } catch (e) {
+        // Ignore errors when clearing empty data
+      }
+      return;
+    }
+
+    try {
+      // Prepare data for sync
+      Map<String, dynamic> recordsMap = {};
+      final recordsRef =
+          FirebaseManager().rootPath.child('errorcccd').child('records');
+
+      for (int i = 0; i < errorCCCDList.length; i++) {
+        CCCDInfo errorCCCD = errorCCCDList[i];
+
+        Map<String, dynamic> errorRecord =
+            Map<String, dynamic>.from(errorCCCD.toJsonFull());
+        errorRecord['errorIndex'] = i + 1;
+        errorRecord['errorTimestamp'] =
+            DateTime.now().millisecondsSinceEpoch.toString();
+        
+        // Add position in total list
+        int position = totalCCCD.indexWhere((item) => item.Id == errorCCCD.Id);
+        if (position != -1) {
+          errorRecord['positionInTotalList'] = position + 1;
+          errorRecord['totalListCount'] = totalCCCD.length;
+        }
+
+        // Create unique key for each record
+        String? uniqueKey = recordsRef.push().key;
+        if (uniqueKey != null) {
+          recordsMap[uniqueKey] = errorRecord;
+        }
+      }
+
+      // Prepare final payload
+      Map<String, dynamic> finalPayload = {
+        'metadata': {
+          'totalErrorRecords': errorCCCDList.length,
+          'syncTimestamp': DateTime.now().millisecondsSinceEpoch.toString(),
+          'syncDate': DateTime.now().toIso8601String(),
+          'autoSync': true,
+          'currentIndex': indexCurrent.value,
+        },
+        'records': recordsMap,
+      };
+
+      // Sync to Firebase
+      await FirebaseManager().rootPath.child('errorcccd').set(finalPayload);
+    } catch (e) {
+      // Silent fail for auto sync to avoid interrupting user experience
+      print('Auto sync error CCCD to Firebase failed: $e');
+    }
   }
 }
