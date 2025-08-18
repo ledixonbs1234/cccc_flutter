@@ -1,0 +1,68 @@
+{
+  "project_info": {
+    "project_number": "892472148061",
+    "firebase_url": "https://xonapp-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "xonapp",
+    "storage_bucket": "xonapp.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:892472148061:android:64f29029e7c5ce3826cdb4",
+        "android_client_info": {
+          "package_name": "com.example.app_test"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCm8vcumpnJICxh7XZ3jKPcncrDvLg8NtA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:892472148061:android:444ab8ac546fedb326cdb4",
+        "android_client_info": {
+          "package_name": "com.example.capture_cccd"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCm8vcumpnJICxh7XZ3jKPcncrDvLg8NtA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:892472148061:android:d9c3f2b749219e9e26cdb4",
+        "android_client_info": {
+          "package_name": "com.example.cccd_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCm8vcumpnJICxh7XZ3jKPcncrDvLg8NtA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -33,24 +33,29 @@ class HomeView extends GetView<HomeController> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Section 1: Postal Code Input Card
+              // Section 1: Status Message
+              _buildStatusMessageSection(context, colorScheme),
+
+              const SizedBox(height: 8.0),
+
+              // Section 2: Postal Code Input Card
               _buildPostalCodeSection(context, colorScheme),
 
-              const SizedBox(height: 24.0),
+              const SizedBox(height: 8.0),
 
-              // Section 2: Action Buttons
+              // Section 3: Action Buttons
               _buildActionButtonsSection(context, colorScheme),
 
-              const SizedBox(height: 24.0),
+              const SizedBox(height: 8.0),
 
-              // Section 3: Status and Controls
+              // Section 4: Status and Controls
               _buildStatusSection(context, colorScheme),
 
-              const SizedBox(height: 24.0),
-              // Section 4: Search
+              const SizedBox(height: 8.0),
+              // Section 5: Search
               _buildSearchSection(context, colorScheme),
 
-              const SizedBox(height: 24.0),
+              const SizedBox(height: 8.0),
 
               // Section 5: Search Results (conditional)
               _buildSearchResultsSection(context, colorScheme),
@@ -229,6 +234,24 @@ class HomeView extends GetView<HomeController> {
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: () {
+                      controller.testCapture();
+                    },
+                    icon: const Icon(Icons.science),
+                    label: const Text('Test Capture'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: colorScheme.tertiary,
+                      side: BorderSide(color: colorScheme.tertiary),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
                       controller.deleteAllCCCDData();
                     },
                     icon: const Icon(Icons.delete_forever),
@@ -250,50 +273,53 @@ class HomeView extends GetView<HomeController> {
 
             // Error management buttons row
             Obx(() => Row(
-              children: [
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: controller.isAutoRun.value
-                        ? () {
-                            controller.addCurrentCCCDToError();
-                          }
-                        : null,
-                    icon: const Icon(Icons.error_outline),
-                    label: const Text('CCCD Lỗi'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: controller.isAutoRun.value
-                          ? colorScheme.error
-                          : colorScheme.surfaceContainerHighest,
-                      foregroundColor: controller.isAutoRun.value
-                          ? colorScheme.onError
-                          : colorScheme.onSurfaceVariant,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                  children: [
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: controller.isAutoRun.value
+                            ? () {
+                                controller.addCurrentCCCDToError();
+                              }
+                            : null,
+                        icon: const Icon(Icons.error_outline),
+                        label: const Text('CCCD Lỗi'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: controller.isAutoRun.value
+                              ? colorScheme.error
+                              : colorScheme.surfaceContainerHighest,
+                          foregroundColor: controller.isAutoRun.value
+                              ? colorScheme.onError
+                              : colorScheme.onSurfaceVariant,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      controller.navigateToCCCDErrorPage();
-                    },
-                    icon: const Icon(Icons.list_alt),
-                    label: Text('Xem Lỗi (${controller.errorCCCDList.length})'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: colorScheme.tertiary,
-                      side: BorderSide(color: colorScheme.tertiary),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          controller.navigateToCCCDErrorPage();
+                        },
+                        icon: const Icon(Icons.list_alt),
+                        label: Text(
+                            'Xem Lỗi (${controller.errorCCCDList.length})'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: colorScheme.tertiary,
+                          side: BorderSide(color: colorScheme.tertiary),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
-              ],
-            )),
+                  ],
+                )),
+
+            const SizedBox(height: 8),
           ],
         ),
       ),
@@ -1251,5 +1277,139 @@ class HomeView extends GetView<HomeController> {
         ],
       );
     });
+  }
+
+  // Helper method to build status message section
+  Widget _buildStatusMessageSection(
+      BuildContext context, ColorScheme colorScheme) {
+    return Obx(() {
+      // Only show if there's a status message
+      if (controller.statusMessage.value.isEmpty) {
+        return const SizedBox.shrink();
+      }
+
+      Color backgroundColor;
+      Color textColor;
+      Color borderColor;
+      IconData icon;
+
+      // Determine colors and icon based on status type
+      switch (controller.statusType.value) {
+        case StatusType.success:
+          backgroundColor = colorScheme.primaryContainer;
+          textColor = colorScheme.onPrimaryContainer;
+          borderColor = colorScheme.primary;
+          icon = Icons.check_circle_outline;
+          break;
+        case StatusType.error:
+          backgroundColor = colorScheme.errorContainer;
+          textColor = colorScheme.onErrorContainer;
+          borderColor = colorScheme.error;
+          icon = Icons.error_outline;
+          break;
+        case StatusType.warning:
+          backgroundColor = Colors.orange.withOpacity(0.1);
+          textColor = Colors.orange.shade800;
+          borderColor = Colors.orange;
+          icon = Icons.warning_amber_outlined;
+          break;
+        case StatusType.info:
+          backgroundColor = Colors.blue.withOpacity(0.1);
+          textColor = Colors.blue.shade800;
+          borderColor = Colors.blue;
+          icon = Icons.info_outline;
+          break;
+        default:
+          return const SizedBox.shrink();
+      }
+
+      return AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+        child: Card(
+          elevation: 3,
+          shadowColor: borderColor.withOpacity(0.3),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: borderColor, width: 1.5),
+          ),
+          child: Container(
+            decoration: BoxDecoration(
+              color: backgroundColor,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: borderColor.withOpacity(0.1),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: borderColor.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    icon,
+                    color: borderColor,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        controller.statusMessage.value,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: textColor,
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Lúc ${_formatTime(controller.lastOperationTime.value)}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: textColor.withOpacity(0.7),
+                              fontSize: 12,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: () {
+                      controller.clearStatusMessage();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      child: Icon(
+                        Icons.close,
+                        color: textColor.withOpacity(0.7),
+                        size: 18,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    });
+  }
+
+  // Helper method to format time
+  String _formatTime(DateTime dateTime) {
+    return '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}:${dateTime.second.toString().padLeft(2, '0')}';
   }
 }

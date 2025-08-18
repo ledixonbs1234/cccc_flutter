@@ -1,19 +1,18 @@
 import 'dart:async';
 import 'dart:math';
 
-import 'package:assets_audio_player/assets_audio_player.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:diacritic/diacritic.dart';
 import 'package:flutter/material.dart';
-
-import 'package:flutter/services.dart';
-
-import 'package:flutter_barcode_scanner/flutter_barcode_scanner.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
 import 'package:get/get.dart';
 
 import '../../../managers/fireabaseManager.dart';
 import '../models/MessageModel.dart';
 import '../models/cccdInfo.dart';
+
+enum StatusType { none, success, error, info, warning }
 
 class HomeController extends GetxController {
   final count = 0.obs;
@@ -25,18 +24,32 @@ class HomeController extends GetxController {
   final errorCCCDList = <CCCDInfo>[].obs;
   final currentPostalCode = "".obs;
 
+  // NotFound retry tracking
+  String? _lastNotFoundCCCDName;
+  bool _hasTriedResend = false;
+
   final scrollController = ScrollController();
   final postalCodeController = TextEditingController();
   final searchController = TextEditingController();
 
   // Fixed item extent for ListView - ensures precise scroll positioning
-  static const double cccdItemExtent = 112.0;
-
-  // Search results state management
+  static const double cccdItemExtent = 112.0; // Search results state management
   final searchResults = <CCCDInfo>[].obs;
   final searchQuery = "".obs;
   final isSearchActive = false.obs;
   final hasSearchText = false.obs;
+
+  // Audio settings
+  final isSoundEnabled = true.obs;
+
+  // Mobile scanner controller and flash state
+  MobileScannerController? _mobileScannerController;
+  final isFlashEnabled = false.obs;
+
+  // Status message system
+  final statusMessage = "".obs;
+  final statusType = StatusType.none.obs;
+  final lastOperationTime = DateTime.now().obs;
 
   @override
   void onInit() {
@@ -45,7 +58,95 @@ class HomeController extends GetxController {
     postalCodeController.addListener(() {
       currentPostalCode.value = postalCodeController.text;
     });
-    totalCCCD.addAll(generateRandomCCCDData(50));
+    // totalCCCD.addAll(generateRandomCCCDData(50));
+  }
+
+  // Helper method to play beep sound
+  void _playBeepSound() {
+    if (!isSoundEnabled.value) return; // Skip if sound is disabled
+
+    try {
+      // Create a new AudioPlayer instance for each beep to allow overlapping sounds
+      final beepPlayer = AudioPlayer();
+      beepPlayer.play(AssetSource('beep.mp3'));
+
+      // Auto-dispose the player after sound completes
+      beepPlayer.onPlayerComplete.listen((_) {
+        beepPlayer.dispose();
+      });
+    } catch (e) {
+      print('Error playing beep sound: $e');
+    }
+  }
+
+  // Status message management methods
+  void showStatusMessage(String message, StatusType type) {
+    statusMessage.value = message;
+    statusType.value = type;
+    lastOperationTime.value = DateTime.now();
+
+    // Auto clear status after 5 seconds
+    Timer(const Duration(seconds: 5), () {
+      clearStatusMessage();
+    });
+  }
+
+  void clearStatusMessage() {
+    statusMessage.value = "";
+    statusType.value = StatusType.none;
+  }
+
+  void showSuccessMessage(String message) {
+    showStatusMessage(message, StatusType.success);
+  }
+
+  void showErrorMessage(String message) {
+    showStatusMessage(message, StatusType.error);
+  }
+
+  void showInfoMessage(String message) {
+    showStatusMessage(message, StatusType.info);
+  }
+
+  void showWarningMessage(String message) {
+    showStatusMessage(message, StatusType.warning);
+  }
+
+  /// Toggle sound on/off
+  void toggleSound() {
+    isSoundEnabled.value = !isSoundEnabled.value;
+    showInfoMessage(
+        isSoundEnabled.value ? "Đã bật âm thanh beep" : "Đã tắt âm thanh beep");
+  }
+
+  /// Toggle flash on/off for mobile scanner
+  void _toggleFlash() {
+    try {
+      isFlashEnabled.value = !isFlashEnabled.value;
+      _mobileScannerController?.toggleTorch();
+
+      showInfoMessage(
+          isFlashEnabled.value ? "Đã bật đèn flash" : "Đã tắt đèn flash");
+    } catch (e) {
+      showErrorMessage("Không thể bật/tắt đèn flash: $e");
+    }
+  }
+
+  /// Dispose mobile scanner controller safely
+  void _disposeMobileScannerController() {
+    try {
+      _mobileScannerController?.dispose();
+      _mobileScannerController = null;
+      isFlashEnabled.value = false;
+    } catch (e) {
+      print('Error disposing mobile scanner controller: $e');
+    }
+  }
+
+  @override
+  void onReady() {
+    super.onReady();
+    test();
   }
 
   String formatDateString(String inputDate) {
@@ -93,7 +194,11 @@ class HomeController extends GetxController {
       if (!isAutoRun.value) {
         sendCCCD(cccdInfo);
       } else {
-        totalCCCD.add(cccdInfo);
+        CCCDInfo? existingCCCD = totalCCCD
+            .firstWhereOrNull((cccd) => cccd.maBuuGui == cccdInfo.maBuuGui);
+        if (existingCCCD == null) {
+          totalCCCD.add(cccdInfo);
+        }
       }
       // Nếu isAutoRun bật và không có yêu cầu đang gửi, bắt đầu xử lý hàng đợi
       if (isAutoRun.value && !isSending) {
@@ -103,127 +208,595 @@ class HomeController extends GetxController {
   }
 
   void capture() {
+    // Navigate to mobile scanner page
+    Get.to(
+      () => _buildMobileScannerPage(),
+      transition: Transition.rightToLeft,
+      duration: const Duration(milliseconds: 300),
+    );
+  }
+
+  /// Build mobile scanner page with custom UI
+  Widget _buildMobileScannerPage() {
+    // Initialize scanner controller
+    _mobileScannerController = MobileScannerController(
+      detectionSpeed: DetectionSpeed.noDuplicates,
+      facing: CameraFacing.back,
+      torchEnabled: isFlashEnabled.value,
+    );
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        title: const Text(
+          'Quét CCCD',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: Colors.black,
+        iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          Obx(() => IconButton(
+                icon: Icon(
+                  isFlashEnabled.value ? Icons.flash_on : Icons.flash_off,
+                  color: isFlashEnabled.value ? Colors.yellow : Colors.white,
+                ),
+                onPressed: () {
+                  _toggleFlash();
+                },
+              )),
+          IconButton(
+            icon: const Icon(Icons.science),
+            onPressed: () {
+              // Fallback to test capture
+              _disposeMobileScannerController();
+              Get.back();
+              testCapture();
+            },
+          ),
+        ],
+      ),
+      body: Stack(
+        children: [
+          // Mobile Scanner
+          MobileScanner(
+            controller: _mobileScannerController!,
+            onDetect: (capture) {
+              final List<Barcode> barcodes = capture.barcodes;
+              for (final barcode in barcodes) {
+                if (barcode.rawValue != null) {
+                  _processCapturedBarcode(barcode.rawValue!);
+                  // _disposeMobileScannerController();
+                  // Get.back(); // Close scanner
+                  break;
+                }
+              }
+            },
+          ), // Overlay with scanning area
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.5),
+            ),
+            child: Stack(
+              children: [
+                // Scanning area cutout
+                Center(
+                  child: Container(
+                    width: 300,
+                    height: 200,
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: Colors.green,
+                        width: 2,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        color: Colors.transparent,
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Instructions
+                Positioned(
+                  bottom: 100,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      children: [
+                        const Text(
+                          'Đặt mã QR CCCD vào khung quét',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            _buildActionButton(
+                              icon: Icons.science,
+                              label: 'Test',
+                              onPressed: () {
+                                Get.back();
+                                testCapture();
+                              },
+                            ),
+                            _buildActionButton(
+                              icon: Icons.close,
+                              label: 'Đóng',
+                              onPressed: () {
+                                _disposeMobileScannerController();
+                                Get.back();
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Build action button for scanner overlay
+  Widget _buildActionButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+  }) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withOpacity(0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: Colors.white, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Process captured barcode from mobile scanner
+  void _processCapturedBarcode(String barcodeData) {
     try {
-      List<String> tempBarcode = [];
-      if (streamCapture != null) {
-        streamCapture!.cancel();
-      }
+      String barcodeFilled = barcodeData.trim().toUpperCase();
+      List<String> textSplit = barcodeFilled.split('|');
 
-      streamCapture = FlutterBarcodeScanner.getBarcodeStreamReceiver(
-              "#ff6666", 'Cancel', true, ScanMode.DEFAULT)
-          ?.listen((barcode) async {
-        String barcodeFilled = barcode.trim().toString().toUpperCase();
+      // Kiểm tra điều kiện CCCD format
+      if (textSplit.length == 7 || textSplit.length == 11) {
+        CCCDInfo cccdInfo = CCCDInfo(
+            textSplit[2], formatDateString(textSplit[3]), textSplit[0]);
 
-        List<String> textSplit = barcodeFilled.split('|');
-
-        // Kiểm tra điều kiện
-        if ((textSplit.length == 7 || textSplit.length == 11) &&
-            !tempBarcode.contains(barcodeFilled)) {
-          tempBarcode.add(barcodeFilled);
-          CCCDInfo cccdInfo = CCCDInfo(
-              textSplit[2], formatDateString(textSplit[3]), textSplit[0]);
-          // Thêm giới tính nếu có
-          if (textSplit.length >= 5) {
-            cccdInfo.gioiTinh = textSplit[4];
+        // Thêm giới tính nếu có
+        if (textSplit.length >= 5) {
+          cccdInfo.gioiTinh = textSplit[4];
+          if (textSplit.length >= 6) {
             cccdInfo.DiaChi = textSplit[5];
           }
-          // Thêm mã bưu gửi hiện tại
-          cccdInfo.maBuuGui = currentPostalCode.value.isNotEmpty
-              ? currentPostalCode.value
-              : null;
-          //tạo rung nhẹ
-          AssetsAudioPlayer.newPlayer().open(
-            Audio("assets/beep.mp3"),
-          );
-          if (!isAutoRun.value) {
-            sendCCCD(cccdInfo);
-          } else {
+        }
+
+        // Thêm mã bưu gửi hiện tại
+        cccdInfo.maBuuGui =
+            currentPostalCode.value.isNotEmpty ? currentPostalCode.value : null;
+
+        if (!isAutoRun.value) {
+          sendCCCD(cccdInfo);
+          // Phát âm thanh thông báo
+          _playBeepSound();
+        } else {
+          // Check existing cccd has same ID
+          CCCDInfo? existingCCCD =
+              totalCCCD.firstWhereOrNull((cccd) => cccd.Id == cccdInfo.Id);
+          if (existingCCCD == null) {
             totalCCCD.add(cccdInfo);
           }
-          // Nếu isAutoRun bật và không có yêu cầu đang gửi, bắt đầu xử lý hàng đợi
-          if (isAutoRun.value && !isSending) {
-            processCCCD();
-          }
+          // Always play beep sound
+          _playBeepSound();
         }
-      });
-    } on PlatformException {
-      Get.snackbar("Thông báo", "Lỗi barcode");
+
+        // Nếu isAutoRun bật và không có yêu cầu đang gửi, bắt đầu xử lý hàng đợi
+        if (isAutoRun.value && !isSending) {
+          processCCCD();
+        }
+      } else {
+        // Invalid barcode format
+        showErrorMessage("Mã QR không đúng định dạng CCCD");
+      }
+    } catch (e) {
+      showErrorMessage("Lỗi xử lý mã QR: $e");
     }
 
     update();
   }
 
-  /// Scan postal code using camera or QR code scanner
-  void scanPostalCode() {
+  /// Test function that simulates capture() with random barcode data
+  Future<void> testCapture() async {
     try {
-      // Use barcode scanner to scan postal code
-      FlutterBarcodeScanner.scanBarcode(
-        "#ff6666", // Scanner line color
-        "Hủy", // Cancel button text
-        true, // Show flash icon
-        ScanMode.DEFAULT, // Scan mode
-      ).then((scannedCode) {
-        if (scannedCode != '-1' && scannedCode.isNotEmpty) {
-          // Process the scanned postal code
-          String cleanedCode = scannedCode.trim().toUpperCase();
+      // Generate random barcode data similar to real CCCD format
+      String randomBarcode = _generateRandomBarcodeData();
 
-          // Update postal code controller and reactive variable
-          postalCodeController.text = cleanedCode;
-          currentPostalCode.value = cleanedCode;
+      // Process the random barcode like real capture
+      String barcodeFilled = randomBarcode.trim().toString().toUpperCase();
+      List<String> textSplit = barcodeFilled.split('|');
 
-          // Show success feedback
-          Get.snackbar(
-            "Quét thành công",
-            "Đã quét mã bưu gửi: $cleanedCode",
-            duration: const Duration(seconds: 3),
-            snackPosition: SnackPosition.BOTTOM,
-            backgroundColor: Get.theme.colorScheme.primaryContainer,
-            colorText: Get.theme.colorScheme.onPrimaryContainer,
-            icon: Icon(
-              Icons.check_circle,
-              color: Get.theme.colorScheme.onPrimaryContainer,
-            ),
-          );
+      // Kiểm tra điều kiện (same logic as capture)
+      if (textSplit.length == 7 || textSplit.length == 11) {
+        CCCDInfo cccdInfo = CCCDInfo(
+            textSplit[2], formatDateString(textSplit[3]), textSplit[0]);
 
-          // Play success sound
-          AssetsAudioPlayer.newPlayer().open(
-            Audio("assets/beep.mp3"),
-          );
-        } else {
-          // Show cancellation or error message
-          Get.snackbar(
-            "Quét bị hủy",
-            "Việc quét mã bưu gửi đã bị hủy",
-            duration: const Duration(seconds: 2),
-            snackPosition: SnackPosition.BOTTOM,
-            backgroundColor: Get.theme.colorScheme.errorContainer,
-            colorText: Get.theme.colorScheme.onErrorContainer,
-          );
+        // Thêm giới tính nếu có
+        if (textSplit.length >= 5) {
+          cccdInfo.gioiTinh = textSplit[4];
+          cccdInfo.DiaChi = textSplit[5];
         }
-      });
-    } on PlatformException catch (e) {
-      // Handle scanning errors
-      Get.snackbar(
-        "Lỗi quét mã",
-        "Không thể quét mã bưu gửi: ${e.message}",
-        duration: const Duration(seconds: 3),
-        snackPosition: SnackPosition.BOTTOM,
-        backgroundColor: Get.theme.colorScheme.errorContainer,
-        colorText: Get.theme.colorScheme.onErrorContainer,
-        icon: Icon(
-          Icons.error,
-          color: Get.theme.colorScheme.onErrorContainer,
+
+        // Thêm mã bưu gửi hiện tại
+        cccdInfo.maBuuGui =
+            currentPostalCode.value.isNotEmpty ? currentPostalCode.value : null;
+
+        if (!isAutoRun.value) {
+          sendCCCD(cccdInfo);
+          // Phát âm thanh thông báo
+          _playBeepSound();
+        } else {
+          // Check existing cccd has same ID (not maBuuGui to allow more variety)
+          CCCDInfo? existingCCCD =
+              totalCCCD.firstWhereOrNull((cccd) => cccd.Id == cccdInfo.Id);
+          if (existingCCCD == null) {
+            totalCCCD.add(cccdInfo);
+          }
+          // Always play beep sound in test mode regardless of duplicate
+          _playBeepSound();
+        }
+
+        // Nếu isAutoRun bật và không có yêu cầu đang gửi, bắt đầu xử lý hàng đợi
+        if (isAutoRun.value && !isSending) {
+          processCCCD();
+        }
+      }
+    } catch (e) {
+      showErrorMessage("Lỗi test capture: $e");
+    }
+
+    update();
+  }
+
+  /// Generate random barcode data that matches CCCD format
+  String _generateRandomBarcodeData() {
+    Random random = Random();
+
+    // Danh sách họ tên mẫu
+    List<String> sampleNames = [
+      "Nguyễn Văn An",
+      "Trần Thị Bình",
+      "Lê Minh Cường",
+      "Phạm Thị Dung",
+      "Hoàng Văn Hải",
+      "Võ Thị Linh",
+      "Đặng Minh Phúc",
+      "Bùi Thị Nga",
+      "Đỗ Văn Sơn",
+      "Huỳnh Thị Thảo",
+      "Dương Lê Như Ngọc",
+      "Phan Văn Long",
+      "Vũ Thị Mai",
+      "Tôn Văn Nam",
+      "Lý Thị Oanh"
+    ];
+
+    // Danh sách địa chỉ mẫu
+    List<String> sampleAddresses = [
+      "Tổ 7, Khu Phố Thiện Đức Bắc, Hoài Hương, Hoài Nhơn, Bình Định",
+      "Phường 1, Quận 3, TP. Hồ Chí Minh",
+      "Xã Tân Phú, Huyện Đức Trọng, Lâm Đồng",
+      "Phường Hải Châu, Quận Hải Châu, Đà Nẵng",
+      "Xã Phú Hòa, Huyện Krông Pắc, Đắk Lắk",
+      "Phường Nguyễn Du, TP. Huế, Thừa Thiên Huế"
+    ];
+
+    // Generate random CCCD ID (12 digits) with timestamp to ensure uniqueness
+    String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+    String cccdId = '';
+    for (int i = 0; i < 8; i++) {
+      cccdId += random.nextInt(10).toString();
+    }
+    // Add last 4 digits from timestamp for uniqueness
+    cccdId += timestamp.substring(timestamp.length - 4);
+
+    // Generate random birth date (DDMMYYYY format)
+    int day = 1 + random.nextInt(28);
+    int month = 1 + random.nextInt(12);
+    int year = 1970 + random.nextInt(35); // 1970-2005
+    String birthDate =
+        '${day.toString().padLeft(2, '0')}${month.toString().padLeft(2, '0')}$year';
+
+    // Random name and address
+    String name = sampleNames[random.nextInt(sampleNames.length)];
+    String gender = random.nextBool() ? "Nam" : "Nữ";
+    String address = sampleAddresses[random.nextInt(sampleAddresses.length)];
+
+    // Generate issue date (DDMMYYYY format) - usually recent
+    String issueDate = "06112024";
+
+    // Create barcode in format: ID||Name|BirthDate|Gender|Address|IssueDate||ParentName1|ParentName2|
+    String barcode =
+        "$cccdId||$name|$birthDate|$gender|$address|$issueDate||||";
+
+    return barcode;
+  }
+
+  /// Scan postal code using mobile scanner
+  void scanPostalCode() {
+    // Navigate to postal code scanner page
+    Get.to(
+      () => _buildPostalCodeScannerPage(),
+      transition: Transition.rightToLeft,
+      duration: const Duration(milliseconds: 300),
+    );
+  }
+
+  /// Build postal code scanner page with custom UI
+  Widget _buildPostalCodeScannerPage() {
+    // Initialize scanner controller for postal code scanning
+    MobileScannerController postalScannerController = MobileScannerController(
+      detectionSpeed: DetectionSpeed.noDuplicates,
+      facing: CameraFacing.back,
+      torchEnabled: false,
+    );
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        title: const Text(
+          'Quét mã bưu gửi',
+          style: TextStyle(color: Colors.white),
         ),
+        backgroundColor: Colors.black,
+        iconTheme: const IconThemeData(color: Colors.white),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.flash_off),
+            onPressed: () {
+              postalScannerController.toggleTorch();
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.edit),
+            onPressed: () {
+              // Fallback to manual input
+              postalScannerController.dispose();
+              Get.back();
+              _showManualPostalCodeInput();
+            },
+          ),
+        ],
+      ),
+      body: Stack(
+        children: [
+          // Mobile Scanner
+          MobileScanner(
+            controller: postalScannerController,
+            onDetect: (capture) {
+              final List<Barcode> barcodes = capture.barcodes;
+              for (final barcode in barcodes) {
+                if (barcode.rawValue != null) {
+                  _processPostalCodeBarcode(
+                      barcode.rawValue!, postalScannerController);
+                  break;
+                }
+              }
+            },
+          ),
+          // Overlay with scanning area
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.5),
+            ),
+            child: Stack(
+              children: [
+                // Scanning area cutout for postal code
+                Center(
+                  child: Container(
+                    width: 280,
+                    height: 150,
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: Colors.blue,
+                        width: 2,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        color: Colors.transparent,
+                      ),
+                    ),
+                  ),
+                ),
+                // Instructions
+                Positioned(
+                  bottom: 100,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      children: [
+                        const Text(
+                          'Đặt mã vạch hoặc QR code mã bưu gửi vào khung quét',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            _buildActionButton(
+                              icon: Icons.edit,
+                              label: 'Nhập tay',
+                              onPressed: () {
+                                postalScannerController.dispose();
+                                Get.back();
+                                _showManualPostalCodeInput();
+                              },
+                            ),
+                            _buildActionButton(
+                              icon: Icons.close,
+                              label: 'Đóng',
+                              onPressed: () {
+                                postalScannerController.dispose();
+                                Get.back();
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Process captured postal code barcode
+  void _processPostalCodeBarcode(
+      String barcodeData, MobileScannerController controller) {
+    try {
+      String postalCode = barcodeData.trim();
+
+      if (postalCode.isNotEmpty) {
+        // Update postal code
+        postalCodeController.text = postalCode;
+        currentPostalCode.value = postalCode;
+
+        // Play beep sound
+        _playBeepSound();
+
+        // Dispose scanner and go back
+        controller.dispose();
+        Get.back();
+
+        // Show success message
+        Get.snackbar(
+          "Thành công",
+          "Đã cập nhật mã bưu gửi: $postalCode",
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 2),
+          icon: const Icon(Icons.check_circle, color: Colors.white),
+        );
+      } else {
+        Get.snackbar(
+          "Lỗi",
+          "Mã bưu gửi không hợp lệ",
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 2),
+        );
+      }
+    } catch (e) {
+      Get.snackbar(
+        "Lỗi xử lý",
+        "Không thể xử lý mã bưu gửi: $e",
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+        duration: const Duration(seconds: 2),
       );
     }
 
     update();
   }
 
+  /// Show manual postal code input dialog as fallback
+  void _showManualPostalCodeInput() {
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Nhập mã bưu gửi'),
+        content: TextField(
+          controller: postalCodeController,
+          decoration: const InputDecoration(
+            labelText: 'Mã bưu gửi',
+            border: OutlineInputBorder(),
+            hintText: 'Ví dụ: BĐ590123',
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Hủy'),
+          ),
+          TextButton(
+            onPressed: () {
+              String enteredCode = postalCodeController.text.trim();
+              if (enteredCode.isNotEmpty) {
+                currentPostalCode.value = enteredCode;
+                Get.back();
+                Get.snackbar(
+                  "Thành công",
+                  "Đã cập nhật mã bưu gửi: $enteredCode",
+                  backgroundColor: Colors.green,
+                  colorText: Colors.white,
+                  duration: const Duration(seconds: 2),
+                );
+              } else {
+                Get.snackbar(
+                  "Lỗi",
+                  "Vui lòng nhập mã bưu gửi",
+                  backgroundColor: Colors.orange,
+                  colorText: Colors.white,
+                  duration: const Duration(seconds: 2),
+                );
+              }
+            },
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
   bool isSending = false;
 
-  void sendCCCD(CCCDInfo cccdInfo) {
-    FirebaseManager().rootPath.child('cccd').set(cccdInfo.toJson());
+  Future<void> sendCCCD(CCCDInfo cccdInfo) async {
+    await FirebaseManager().rootPath.child('cccd').set(cccdInfo.toJson());
   }
 
   void processCCCD() {
@@ -231,6 +804,8 @@ class HomeController extends GetxController {
     if (isAutoRun.value &&
         !isSending &&
         indexCurrent.value < totalCCCD.length) {
+      // Reset notFound tracking when processing new CCCD
+
       // Lấy CCCDInfo tiếp theo
       CCCDInfo cccdInfo = totalCCCD[indexCurrent.value];
       nameCurrent.value = cccdInfo.Name;
@@ -250,6 +825,7 @@ class HomeController extends GetxController {
 
   @override
   void onClose() {
+    _disposeMobileScannerController();
     postalCodeController.dispose();
     searchController.dispose();
     super.onClose();
@@ -258,26 +834,20 @@ class HomeController extends GetxController {
   void increment() => count.value++;
 
   void saveData() {
+    // TODO: Implement with mobile_scanner
+    // For now, use testCapture and save to Firebase
     try {
-      List<String> tempBarcode = [];
-      if (streamSaveData != null) {
-        streamSaveData!.cancel();
-      }
-      streamSaveData = FlutterBarcodeScanner.getBarcodeStreamReceiver(
-              "#ff6666", 'Cancel', true, ScanMode.DEFAULT)
-          ?.listen((barcode) async {
-        String barcodeFilled = barcode.trim().toString().toUpperCase();
-        List<String> textSplit = barcodeFilled.split('|');
+      String randomBarcode = _generateRandomBarcodeData();
+      String barcodeFilled = randomBarcode.trim().toString().toUpperCase();
+      List<String> textSplit = barcodeFilled.split('|');
 
-        // Kiểm tra điều kiện và gọi hàm xử lý
-        if ((textSplit.length == 7 || textSplit.length == 11) &&
-            !tempBarcode.contains(barcodeFilled)) {
-          tempBarcode.add(barcodeFilled);
-          await _processCCCDInfo(textSplit);
-        }
-      });
-    } on PlatformException {
-      Get.snackbar("Thông báo", "Lỗi barcode");
+      // Kiểm tra điều kiện và gọi hàm xử lý
+      if (textSplit.length == 7 || textSplit.length == 11) {
+        _processCCCDInfo(textSplit);
+        Get.snackbar("Test Save Data", "Đã lưu dữ liệu CCCD test vào Firebase");
+      }
+    } catch (e) {
+      Get.snackbar("Thông báo", "Lỗi test save data: $e");
     }
 
     update();
@@ -303,10 +873,7 @@ class HomeController extends GetxController {
         .set(cccdInfo.toJsonFull());
 
     // Phát âm thanh thông báo
-    await AssetsAudioPlayer.newPlayer().open(
-      Audio("assets/beep.mp3"),
-      showNotification: true,
-    );
+    _playBeepSound();
   }
 
   Future<void> layDanhSach() async {
@@ -413,12 +980,17 @@ class HomeController extends GetxController {
         "Firebase message received - Lenh: ${message.Lenh}, DoiTuong: ${message.DoiTuong}");
 
     if (message.Lenh == "continueCCCD") {
+      // Reset notFound tracking on successful processing
+      _resetNotFoundTracking();
+
       isSending = false;
       if (isAutoRun.value) {
         indexCurrent.value++;
         // Sau khi nhận được tín hiệu hoàn thành và tăng index, gọi lại processCCCD để xử lý mục tiếp theo
         processCCCD();
       }
+    } else if (message.Lenh == "notFound") {
+      _handleNotFoundMessage(message.DoiTuong);
     } else if (message.Lenh == "sendMaHieu") {
       // Handle postal code update from TypeScript function
       String receivedPostalCode = message.DoiTuong.trim();
@@ -451,6 +1023,40 @@ class HomeController extends GetxController {
         );
       }
     }
+  }
+
+  /// Handle notFound message with retry logic
+  Future<void> _handleNotFoundMessage(String cccdName) async {
+    if (_lastNotFoundCCCDName == cccdName && _hasTriedResend) {
+      // Second time receiving notFound for same CCCD name - add to error list
+      showErrorMessage(
+          "CCCD $cccdName không tìm thấy sau 2 lần thử - đã thêm vào danh sách lỗi");
+      addCurrentCCCDToError();
+      _resetNotFoundTracking(); // Reset tracking for next CCCD
+    } else {
+      // First time or different CCCD - try resending
+      _lastNotFoundCCCDName = cccdName;
+      _hasTriedResend = true;
+
+      showWarningMessage("Không tìm thấy CCCD $cccdName - đang thử gửi lại");
+      await resetSameCCCDFirebase();
+
+      // Resend current CCCD
+      isSending = false;
+      if (isAutoRun.value) {
+        processCCCD();
+      }
+    }
+  }
+
+  /// Reset notFound tracking variables
+  void _resetNotFoundTracking() {
+    _lastNotFoundCCCDName = null;
+    _hasTriedResend = false;
+  }
+
+  Future<void> resetSameCCCDFirebase() async {
+    await sendCCCD(CCCDInfo("", "", ""));
   }
 
   /// Test function to simulate receiving postal code from TypeScript
@@ -734,10 +1340,10 @@ class HomeController extends GetxController {
           '${lastNames[random.nextInt(lastNames.length)]} ${middleNames[random.nextInt(middleNames.length)]} ${firstNames[random.nextInt(firstNames.length)]}';
 
       // Tạo ngày sinh ngẫu nhiên (từ 1950 đến 2005)
-      int year = (1950 + random.nextInt(56)) as int;
-      int month = (1 + random.nextInt(12)) as int;
-      int day = (1 + random.nextInt(28))
-          as int; // Giả sử tháng nào cũng có 28 ngày cho đơn giản
+      int year = 1950 + random.nextInt(56);
+      int month = 1 + random.nextInt(12);
+      int day = 1 +
+          random.nextInt(28); // Giả sử tháng nào cũng có 28 ngày cho đơn giản
       String ngaySinh =
           '${day.toString().padLeft(2, '0')}/${month.toString().padLeft(2, '0')}/$year';
 
@@ -786,7 +1392,7 @@ class HomeController extends GetxController {
         errorCCCDList.add(currentCCCD);
         Get.snackbar(
             "Thông báo", "Đã thêm ${currentCCCD.Name} vào danh sách lỗi");
-        
+
         // Auto sync to Firebase
         _autoSyncErrorToFirebase();
       }
@@ -899,7 +1505,7 @@ class HomeController extends GetxController {
         errorRecord['errorIndex'] = i + 1;
         errorRecord['errorTimestamp'] =
             DateTime.now().millisecondsSinceEpoch.toString();
-        
+
         // Add position in total list
         int position = totalCCCD.indexWhere((item) => item.Id == errorCCCD.Id);
         if (position != -1) {
@@ -932,5 +1538,58 @@ class HomeController extends GetxController {
       // Silent fail for auto sync to avoid interrupting user experience
       print('Auto sync error CCCD to Firebase failed: $e');
     }
+  }
+
+  /// Test method to simulate notFound retry logic
+  void testNotFoundRetryLogic() {
+    if (!isAutoRun.value) {
+      Get.snackbar("Test Error", "Bật chế độ tự động để test");
+      return;
+    }
+
+    if (totalCCCD.isEmpty) {
+      Get.snackbar("Test Error", "Cần có ít nhất 1 CCCD để test");
+      return;
+    }
+
+    String testCCCDName = totalCCCD[indexCurrent.value].Name;
+
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Test NotFound Retry Logic'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('CCCD hiện tại: $testCCCDName'),
+            const SizedBox(height: 16),
+            const Text('Chọn test scenario:'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Get.back();
+              // Test first notFound - should retry
+              _handleNotFoundMessage(testCCCDName);
+            },
+            child: const Text('Test lần 1 (retry)'),
+          ),
+          TextButton(
+            onPressed: () {
+              Get.back();
+              // Simulate already tried once, test second notFound - should add to error
+              _lastNotFoundCCCDName = testCCCDName;
+              _hasTriedResend = true;
+              _handleNotFoundMessage(testCCCDName);
+            },
+            child: const Text('Test lần 2 (add error)'),
+          ),
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Hủy'),
+          ),
+        ],
+      ),
+    );
   }
 }
