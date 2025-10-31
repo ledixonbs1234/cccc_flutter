@@ -5,6 +5,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:diacritic/diacritic.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'package:get/get.dart';
 
@@ -31,6 +32,11 @@ class HomeController extends GetxController {
   final scrollController = ScrollController();
   final postalCodeController = TextEditingController();
   final searchController = TextEditingController();
+  final firebaseKeyController = TextEditingController();
+
+  // Firebase key state
+  final currentFirebaseKey = "".obs;
+  final isKeySetupComplete = false.obs;
 
   // Fixed item extent for ListView - ensures precise scroll positioning
   static const double cccdItemExtent = 112.0; // Search results state management
@@ -58,7 +64,23 @@ class HomeController extends GetxController {
     postalCodeController.addListener(() {
       currentPostalCode.value = postalCodeController.text;
     });
+
+    // Initialize Firebase key
+    _initializeFirebaseKey();
+
     // totalCCCD.addAll(generateRandomCCCDData(50));
+  }
+
+  void _initializeFirebaseKey() {
+    final firebaseManager = FirebaseManager();
+    final savedKey = firebaseManager.currentKey;
+    if (savedKey != null && savedKey.isNotEmpty) {
+      currentFirebaseKey.value = savedKey;
+      firebaseKeyController.text = savedKey;
+      isKeySetupComplete.value = true;
+    } else {
+      isKeySetupComplete.value = false;
+    }
   }
 
   // Helper method to play beep sound
@@ -138,6 +160,8 @@ class HomeController extends GetxController {
       _mobileScannerController?.dispose();
       _mobileScannerController = null;
       isFlashEnabled.value = false;
+      // Disable wakelock when closing scanner
+      WakelockPlus.disable();
     } catch (e) {
       print('Error disposing mobile scanner controller: $e');
     }
@@ -218,6 +242,9 @@ class HomeController extends GetxController {
 
   /// Build mobile scanner page with custom UI
   Widget _buildMobileScannerPage() {
+    // Enable wakelock to keep screen on while scanning
+    WakelockPlus.enable();
+
     // Initialize scanner controller
     _mobileScannerController = MobileScannerController(
       detectionSpeed: DetectionSpeed.noDuplicates,
@@ -565,6 +592,9 @@ class HomeController extends GetxController {
 
   /// Build postal code scanner page with custom UI
   Widget _buildPostalCodeScannerPage() {
+    // Enable wakelock to keep screen on while scanning
+    WakelockPlus.enable();
+
     // Initialize scanner controller for postal code scanning
     MobileScannerController postalScannerController = MobileScannerController(
       detectionSpeed: DetectionSpeed.noDuplicates,
@@ -593,6 +623,7 @@ class HomeController extends GetxController {
             onPressed: () {
               // Fallback to manual input
               postalScannerController.dispose();
+              WakelockPlus.disable();
               Get.back();
               _showManualPostalCodeInput();
             },
@@ -669,6 +700,7 @@ class HomeController extends GetxController {
                               label: 'Nhập tay',
                               onPressed: () {
                                 postalScannerController.dispose();
+                                WakelockPlus.disable();
                                 Get.back();
                                 _showManualPostalCodeInput();
                               },
@@ -678,6 +710,7 @@ class HomeController extends GetxController {
                               label: 'Đóng',
                               onPressed: () {
                                 postalScannerController.dispose();
+                                WakelockPlus.disable();
                                 Get.back();
                               },
                             ),
@@ -711,6 +744,7 @@ class HomeController extends GetxController {
 
         // Dispose scanner and go back
         controller.dispose();
+        WakelockPlus.disable();
         Get.back();
 
         // Show success message
@@ -1425,7 +1459,51 @@ class HomeController extends GetxController {
       'errorList': errorCCCDList.toList(),
       'totalList': totalCCCD.toList(),
       'currentIndex': indexCurrent.value,
+    })?.then((_) {
+      // Re-sync error list when returning from error page
+      _refreshErrorListFromFirebase();
     });
+  }
+
+  /// Refresh error list from Firebase after returning from error page
+  Future<void> _refreshErrorListFromFirebase() async {
+    try {
+      final snapshot = await FirebaseManager()
+          .rootPath
+          .child('errorcccd')
+          .child('records')
+          .get();
+
+      if (snapshot.exists && snapshot.value != null) {
+        Map<dynamic, dynamic> records = snapshot.value as Map<dynamic, dynamic>;
+
+        // Clear current error list
+        errorCCCDList.clear();
+
+        // Rebuild error list from Firebase
+        records.forEach((key, value) {
+          if (value is Map) {
+            try {
+              CCCDInfo cccdInfo = CCCDInfo("", "", "");
+              cccdInfo.fromJson(Map<String, dynamic>.from(value));
+              if (!errorCCCDList.any((item) => item.Id == cccdInfo.Id)) {
+                errorCCCDList.add(cccdInfo);
+              }
+            } catch (e) {
+              print('Error parsing CCCD from Firebase: $e');
+            }
+          }
+        });
+
+        print('Refreshed error list: ${errorCCCDList.length} items');
+      } else {
+        // No error records in Firebase, clear local list
+        errorCCCDList.clear();
+        print('No error records found in Firebase, cleared local list');
+      }
+    } catch (e) {
+      print('Error refreshing error list from Firebase: $e');
+    }
   }
 
   /// Update postal code for all future scanned CCCDs
@@ -1591,5 +1669,111 @@ class HomeController extends GetxController {
         ],
       ),
     );
+  }
+
+  // Firebase Key Management Methods
+  void showFirebaseKeyDialog() {
+    firebaseKeyController.text = currentFirebaseKey.value;
+
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Cấu hình Firebase Key'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Nhập key để liên kết với Chrome Extension và tránh xung đột với người dùng khác:',
+              style: TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: firebaseKeyController,
+              decoration: const InputDecoration(
+                labelText: 'Firebase Key',
+                hintText: 'Ví dụ: user123, room001, ...',
+                border: OutlineInputBorder(),
+              ),
+              maxLength: 20,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Key hiện tại: ${currentFirebaseKey.value.isEmpty ? "Chưa có" : currentFirebaseKey.value}',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Get.back(),
+            child: const Text('Hủy'),
+          ),
+          TextButton(
+            onPressed: () {
+              clearFirebaseKey();
+              Get.back();
+            },
+            child: const Text(
+              'Xóa Key',
+              style: TextStyle(color: Colors.red),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              saveFirebaseKey();
+              Get.back();
+            },
+            child: const Text('Lưu'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void saveFirebaseKey() {
+    final key = firebaseKeyController.text.trim();
+    if (key.isEmpty) {
+      showErrorMessage('Vui lòng nhập Firebase key');
+      return;
+    }
+
+    // Validate key format (alphanumeric only)
+    if (!RegExp(r'^[a-zA-Z0-9_-]+$').hasMatch(key)) {
+      showErrorMessage(
+          'Key chỉ được chứa chữ cái, số, dấu gạch dưới và gạch ngang');
+      return;
+    }
+
+    final firebaseManager = FirebaseManager();
+    firebaseManager.currentKey = key;
+    currentFirebaseKey.value = key;
+    isKeySetupComplete.value = true;
+
+    // Reset Firebase connection với key mới
+    firebaseManager.resetConnection();
+
+    showSuccessMessage('Đã lưu Firebase key: $key');
+  }
+
+  void clearFirebaseKey() {
+    final firebaseManager = FirebaseManager();
+    firebaseManager.currentKey = null;
+    currentFirebaseKey.value = "";
+    firebaseKeyController.clear();
+    isKeySetupComplete.value = false;
+
+    // Reset Firebase connection về mặc định
+    firebaseManager.resetConnection();
+
+    showInfoMessage('Đã xóa Firebase key');
+  }
+
+  String getFirebaseStatus() {
+    if (currentFirebaseKey.value.isEmpty) {
+      return 'Chưa cấu hình key';
+    }
+    return 'Key: ${currentFirebaseKey.value}';
   }
 }

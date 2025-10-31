@@ -30,17 +30,23 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
   cupertino_icons: ^1.0.8
   mobile_scanner: ^7.0.1
   firebase_core: ^2.4.0
   firebase_database: ^10.0.8
   audioplayers: ^6.0.0
   get: ^4.6.6
+  get_storage: ^2.1.1
   flutter_launcher_icons: ^0.14.1
   path_provider: ^2.0.0
   excel: ^4.0.6
   permission_handler: ^11.3.1
   diacritic: ^0.1.6
+  wakelock_plus: ^1.2.8
+  http: ^1.1.0
+  html: ^0.15.4
 
 dev_dependencies:
   flutter_test:

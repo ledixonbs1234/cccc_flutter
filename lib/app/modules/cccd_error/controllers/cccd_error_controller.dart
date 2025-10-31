@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 
 import '../../home/models/cccdInfo.dart';
+import '../../home/controllers/home_controller.dart';
 import '../../../managers/fireabaseManager.dart';
 
 class CccdErrorController extends GetxController {
@@ -121,7 +122,7 @@ class CccdErrorController extends GetxController {
         errorRecord['errorIndex'] = i + 1;
         errorRecord['errorTimestamp'] =
             DateTime.now().millisecondsSinceEpoch.toString();
-        
+
         // Add position in total list if available
         if (totalCCCDList.isNotEmpty) {
           int position = getPositionInTotalList(errorCCCD);
@@ -232,6 +233,10 @@ class CccdErrorController extends GetxController {
     if (index >= 0 && index < errorCCCDList.length) {
       final removedCCCD = errorCCCDList[index];
       errorCCCDList.removeAt(index);
+
+      // Sync back to HomeController's error list
+      _syncBackToHomeController();
+
       Get.snackbar(
           "Thông báo", "Đã xóa ${removedCCCD.Name} khỏi danh sách lỗi");
     }
@@ -248,6 +253,26 @@ class CccdErrorController extends GetxController {
   /// Get total count of CCCDs in the main list
   int getTotalCCCDCount() {
     return totalCCCDList.length;
+  }
+
+  /// Sync error list changes back to HomeController
+  void _syncBackToHomeController() {
+    try {
+      // Try to get HomeController instance if it exists
+      if (Get.isRegistered<HomeController>()) {
+        final homeController = Get.find<HomeController>();
+
+        // Update HomeController's error list to match current list
+        homeController.errorCCCDList.clear();
+        homeController.errorCCCDList.addAll(errorCCCDList);
+
+        print(
+            'Synced ${errorCCCDList.length} error CCCDs back to HomeController');
+      }
+    } catch (e) {
+      print('Could not sync back to HomeController: $e');
+      // Non-critical error, app can continue
+    }
   }
 
   /// Clear all error CCCDs from local list and Firebase
@@ -276,6 +301,9 @@ class CccdErrorController extends GetxController {
                 // Clear local list
                 errorCCCDList.clear();
 
+                // Sync back to HomeController's error list
+                _syncBackToHomeController();
+
                 Get.back();
                 Get.snackbar(
                   "Thành công",
@@ -286,6 +314,10 @@ class CccdErrorController extends GetxController {
               } catch (e) {
                 // If Firebase fails, still clear local list
                 errorCCCDList.clear();
+
+                // Sync back to HomeController's error list
+                _syncBackToHomeController();
+
                 Get.back();
                 Get.snackbar(
                   "Cảnh báo",
@@ -300,5 +332,12 @@ class CccdErrorController extends GetxController {
         ],
       ),
     );
+  }
+
+  @override
+  void onClose() {
+    // Sync final state back to HomeController before closing
+    _syncBackToHomeController();
+    super.onClose();
   }
 }

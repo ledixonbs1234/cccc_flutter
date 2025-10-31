@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:get/get.dart';
 
+import '../../../routes/app_pages.dart';
 import '../controllers/home_controller.dart';
 
 class HomeView extends GetView<HomeController> {
@@ -26,6 +27,25 @@ class HomeView extends GetView<HomeController> {
         backgroundColor: colorScheme.surface,
         elevation: 0,
         scrolledUnderElevation: 4,
+        actions: [
+          // Compact search menu button
+          Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: IconButton(
+              onPressed: () {
+                Get.toNamed(Routes.TIM_KIEM);
+              },
+              icon: Icon(
+                Icons.search,
+                color: colorScheme.primary,
+              ),
+              tooltip: 'Tìm Kiếm CCCD',
+              style: IconButton.styleFrom(
+                backgroundColor: colorScheme.primaryContainer.withOpacity(0.5),
+              ),
+            ),
+          ),
+        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -33,13 +53,16 @@ class HomeView extends GetView<HomeController> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Section 1: Status Message
-              _buildStatusMessageSection(context, colorScheme),
-
-              const SizedBox(height: 8.0),
-
               // Section 2: Postal Code Input Card
               _buildPostalCodeSection(context, colorScheme),
+
+              const SizedBox(height: 8.0),
+              // Section 4: Status and Controls
+              _buildStatusSection(context, colorScheme),
+              const SizedBox(height: 8.0),
+
+              // Section 3: Status Message
+              _buildStatusMessageSection(context, colorScheme),
 
               const SizedBox(height: 8.0),
 
@@ -47,9 +70,8 @@ class HomeView extends GetView<HomeController> {
               _buildActionButtonsSection(context, colorScheme),
 
               const SizedBox(height: 8.0),
-
-              // Section 4: Status and Controls
-              _buildStatusSection(context, colorScheme),
+              // Section 1: Firebase Key Configuration
+              _buildFirebaseKeySection(context, colorScheme),
 
               const SizedBox(height: 8.0),
               // Section 5: Search
@@ -157,6 +179,153 @@ class HomeView extends GetView<HomeController> {
                     ),
                   )
                 : const SizedBox.shrink()),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  controller.scanPostalCode();
+                },
+                icon: const Icon(Icons.qr_code_scanner),
+                label: const Text('Quét mã hiệu'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Helper method to build Firebase key configuration section
+  Widget _buildFirebaseKeySection(
+      BuildContext context, ColorScheme colorScheme) {
+    return Card(
+      elevation: 2,
+      shadowColor: colorScheme.shadow.withOpacity(0.1),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.vpn_key_outlined,
+                  color: colorScheme.primary,
+                  size: 24,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Firebase Key',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.onSurface,
+                      ),
+                ),
+                const Spacer(),
+                Obx(() => IconButton(
+                      onPressed: controller.showFirebaseKeyDialog,
+                      icon: Icon(
+                        controller.isKeySetupComplete.value
+                            ? Icons.edit_outlined
+                            : Icons.add,
+                        color: colorScheme.primary,
+                      ),
+                      tooltip: controller.isKeySetupComplete.value
+                          ? 'Chỉnh sửa key'
+                          : 'Thêm key',
+                    )),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Obx(() => controller.isKeySetupComplete.value
+                ? Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: colorScheme.primary.withOpacity(0.3),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.check_circle,
+                          color: colorScheme.primary,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Đã cấu hình key',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(
+                                      color: colorScheme.onPrimaryContainer,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Key: ${controller.currentFirebaseKey.value}',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      color: colorScheme.onPrimaryContainer
+                                          .withOpacity(0.8),
+                                    ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: colorScheme.errorContainer,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: colorScheme.error.withOpacity(0.3),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.warning_amber_outlined,
+                          color: colorScheme.error,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            'Chưa cấu hình Firebase key. Nhấn + để thêm key liên kết với Chrome Extension.',
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: colorScheme.onErrorContainer,
+                                    ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )),
           ],
         ),
       ),
@@ -193,42 +362,6 @@ class HomeView extends GetView<HomeController> {
               ],
             ),
             const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: () {
-                      controller.capture();
-                    },
-                    icon: const Icon(Icons.camera_alt),
-                    label: const Text('Quét CCCD'),
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      controller.scanPostalCode();
-                    },
-                    icon: const Icon(Icons.qr_code_scanner),
-                    label: const Text('Quét mã hiệu'),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
@@ -377,7 +510,7 @@ class HomeView extends GetView<HomeController> {
                       _buildStatusRow(
                         context,
                         Icons.person_outline,
-                        'Tên hiện tại',
+                        'Tên',
                         controller.nameCurrent.value.isEmpty
                             ? 'Chưa có dữ liệu'
                             : controller.nameCurrent.value,
@@ -395,77 +528,6 @@ class HomeView extends GetView<HomeController> {
                       ),
                     ],
                   ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // Control Actions
-                Row(
-                  children: [
-                    Expanded(
-                      child: Obx(() => FilledButton.icon(
-                            onPressed: controller.totalCCCD.isNotEmpty
-                                ? () {
-                                    // Send CCCD at current position
-                                    if (controller.indexCurrent.value <
-                                        controller.totalCCCD.length) {
-                                      controller.sendCCCD(controller.totalCCCD[
-                                          controller.indexCurrent.value]);
-
-                                      // Show success feedback
-                                      Get.snackbar(
-                                        "Đã gửi",
-                                        "Đã gửi CCCD: ${controller.totalCCCD[controller.indexCurrent.value].Name}",
-                                        duration: const Duration(seconds: 2),
-                                        snackPosition: SnackPosition.BOTTOM,
-                                        backgroundColor:
-                                            colorScheme.primaryContainer,
-                                        colorText:
-                                            colorScheme.onPrimaryContainer,
-                                        icon: Icon(
-                                          Icons.check_circle,
-                                          color: colorScheme.onPrimaryContainer,
-                                        ),
-                                      );
-                                    }
-                                  }
-                                : null, // Disabled when no CCCDs available
-                            icon: const Icon(Icons.send),
-                            label: const Text('Gửi'),
-                            style: FilledButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              backgroundColor: controller.totalCCCD.isNotEmpty
-                                  ? colorScheme.primary
-                                  : colorScheme.surfaceContainerHighest,
-                              foregroundColor: controller.totalCCCD.isNotEmpty
-                                  ? colorScheme.onPrimary
-                                  : colorScheme.onSurfaceVariant,
-                            ),
-                          )),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _buildSwitchTile(
-                        context,
-                        'Tự động',
-                        Icons.autorenew,
-                        controller.isAutoRun.value,
-                        (value) {
-                          controller.isAutoRun.value = value;
-                          if (controller.isAutoRun.value) {
-                            controller.processCCCD();
-                          } else {
-                            controller.isSending = false;
-                          }
-                          controller.sendAutoRunToFirebase(value);
-                        },
-                        colorScheme,
-                      ),
-                    ),
-                  ],
                 ),
 
                 const SizedBox(height: 20),
@@ -502,6 +564,112 @@ class HomeView extends GetView<HomeController> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 20),
+
+                // Control Actions
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: Column(
+                        children: [
+                          SizedBox(
+                            width: double.infinity,
+                            child: FilledButton.icon(
+                              onPressed: () {
+                                controller.capture();
+                              },
+                              icon: const Icon(Icons.camera_alt),
+                              label: const Text('Quét CCCD'),
+                              style: FilledButton.styleFrom(
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: Obx(() => FilledButton.icon(
+                                  onPressed: controller.totalCCCD.isNotEmpty
+                                      ? () {
+                                          // Send CCCD at current position
+                                          if (controller.indexCurrent.value <
+                                              controller.totalCCCD.length) {
+                                            controller.sendCCCD(controller
+                                                    .totalCCCD[
+                                                controller.indexCurrent.value]);
+
+                                            // Show success feedback
+                                            Get.snackbar(
+                                              "Đã gửi",
+                                              "Đã gửi CCCD: ${controller.totalCCCD[controller.indexCurrent.value].Name}",
+                                              duration:
+                                                  const Duration(seconds: 2),
+                                              snackPosition:
+                                                  SnackPosition.BOTTOM,
+                                              backgroundColor:
+                                                  colorScheme.primaryContainer,
+                                              colorText: colorScheme
+                                                  .onPrimaryContainer,
+                                              icon: Icon(
+                                                Icons.check_circle,
+                                                color: colorScheme
+                                                    .onPrimaryContainer,
+                                              ),
+                                            );
+                                          }
+                                        }
+                                      : null, // Disabled when no CCCDs available
+                                  icon: const Icon(Icons.send),
+                                  label: const Text('Gửi'),
+                                  style: FilledButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 16),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    backgroundColor: controller
+                                            .totalCCCD.isNotEmpty
+                                        ? colorScheme.primary
+                                        : colorScheme.surfaceContainerHighest,
+                                    foregroundColor:
+                                        controller.totalCCCD.isNotEmpty
+                                            ? colorScheme.onPrimary
+                                            : colorScheme.onSurfaceVariant,
+                                  ),
+                                )),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      flex: 1,
+                      child: _buildSwitchTile(
+                        context,
+                        'Tự động',
+                        Icons.autorenew,
+                        controller.isAutoRun.value,
+                        (value) {
+                          controller.isAutoRun.value = value;
+                          if (controller.isAutoRun.value) {
+                            controller.processCCCD();
+                          } else {
+                            controller.isSending = false;
+                          }
+                          controller.sendAutoRunToFirebase(value);
+                        },
+                        colorScheme,
                       ),
                     ),
                   ],

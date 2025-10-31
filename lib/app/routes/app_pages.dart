@@ -4,6 +4,8 @@ import '../modules/home/bindings/home_binding.dart';
 import '../modules/home/views/home_view.dart';
 import '../modules/cccd_error/bindings/cccd_error_binding.dart';
 import '../modules/cccd_error/views/cccd_error_view.dart';
+import '../modules/tim_kiem/bindings/tim_kiem_binding.dart';
+import '../modules/tim_kiem/views/tim_kiem_view.dart';
 
 part 'app_routes.dart';
 
@@ -22,6 +24,11 @@ class AppPages {
       name: _Paths.CCCD_ERROR,
       page: () => const CccdErrorView(),
       binding: CccdErrorBinding(),
+    ),
+    GetPage(
+      name: _Paths.TIM_KIEM,
+      page: () => const TimKiemView(),
+      binding: TimKiemBinding(),
     ),
   ];
 }
