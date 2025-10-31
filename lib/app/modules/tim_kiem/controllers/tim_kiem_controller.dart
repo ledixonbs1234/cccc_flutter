@@ -54,7 +54,7 @@ class TimKiemController extends GetxController {
   void _loadCredentials() {
     final username = _storage.read(_usernameKey);
     final password = _storage.read(_passwordKey);
-    
+
     if (username != null) {
       usernameController.text = username;
     }
@@ -67,7 +67,7 @@ class TimKiemController extends GetxController {
   void saveCredentials() {
     _storage.write(_usernameKey, usernameController.text);
     _storage.write(_passwordKey, passwordController.text);
-    
+
     Get.snackbar(
       'Đã lưu',
       'Thông tin tài khoản đã được lưu',
@@ -93,7 +93,8 @@ class TimKiemController extends GetxController {
   Future<void> pickBirthDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: selectedDate ?? DateTime(2000), // Default to year 2000 for birth dates
+      initialDate: selectedDate ??
+          DateTime(2000), // Default to year 2000 for birth dates
       firstDate: DateTime(1900),
       lastDate: DateTime.now(), // Cannot select future dates for birth
       locale: const Locale('vi', 'VN'),
@@ -146,11 +147,13 @@ class TimKiemController extends GetxController {
       // Calculate date range based on selected month
       final now = DateTime.now();
       final currentYear = now.year;
-      final searchMonth = selectedMonth.value > 0 ? selectedMonth.value : now.month;
-      
+      final searchMonth =
+          selectedMonth.value > 0 ? selectedMonth.value : now.month;
+
       // Start date: 1st of selected month
-      final ngayBatDau = _formatDateForWeb(DateTime(currentYear, searchMonth, 1));
-      
+      final ngayBatDau =
+          _formatDateForWeb(DateTime(currentYear, searchMonth, 1));
+
       // End date: last day of month + 2 months OR current date (if selected month is current month)
       DateTime endDate;
       if (searchMonth == now.month && currentYear == now.year) {
@@ -158,7 +161,8 @@ class TimKiemController extends GetxController {
         endDate = DateTime(now.year, now.month + 2, now.day);
       } else {
         // Otherwise, end date is last day of the selected month + 2 months
-        endDate = DateTime(currentYear, searchMonth + 3, 0); // +3 months then day 0 = last day of (month+2)
+        endDate = DateTime(currentYear, searchMonth + 3,
+            0); // +3 months then day 0 = last day of (month+2)
       }
       final ngayKetThuc = _formatDateForWeb(endDate);
 
@@ -224,7 +228,8 @@ class TimKiemController extends GetxController {
       // Process result
       if (result.success) {
         // Parse HTML to extract transaction data
-        final transactions = VNPostHtmlParser.parseTransactions(result.htmlResponse);
+        final transactions =
+            VNPostHtmlParser.parseTransactions(result.htmlResponse);
         webSearchResults.value = transactions;
 
         if (transactions.isEmpty) {

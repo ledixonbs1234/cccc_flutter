@@ -10,7 +10,7 @@ class VNPostHtmlParser {
     try {
       // Find the table body with id="listTbody"
       final tbody = document.getElementById('listTbody');
-      
+
       if (tbody == null) {
         print('Table body not found in HTML');
         return transactions;
@@ -22,7 +22,7 @@ class VNPostHtmlParser {
       for (var row in rows) {
         try {
           final cells = row.querySelectorAll('td');
-          
+
           if (cells.length < 8) {
             continue; // Skip incomplete rows
           }
@@ -33,10 +33,10 @@ class VNPostHtmlParser {
           final hoTen = _cleanText(cells[3].text);
           final maBuuGui = _cleanText(cells[4].text);
           final cuocChuyenPhat = _cleanText(cells[5].text);
-          
+
           // Get procedure info (index 12)
           final maThuTuc = cells.length > 12 ? _cleanText(cells[12].text) : '';
-          
+
           // Get creation date (index 15)
           final ngayTao = cells.length > 15 ? _cleanText(cells[15].text) : '';
 
@@ -63,7 +63,6 @@ class VNPostHtmlParser {
         final totalText = _cleanText(alertInfo.text);
         print('Total transactions found: $totalText');
       }
-
     } catch (e) {
       print('Error parsing HTML: $e');
     }
@@ -80,9 +79,9 @@ class VNPostHtmlParser {
   static bool hasNoResults(String htmlContent) {
     final document = html_parser.parse(htmlContent);
     final tbody = document.getElementById('listTbody');
-    
+
     if (tbody == null) return true;
-    
+
     final rows = tbody.querySelectorAll('tr');
     return rows.isEmpty;
   }
@@ -91,12 +90,12 @@ class VNPostHtmlParser {
   static int getTotalCount(String htmlContent) {
     final document = html_parser.parse(htmlContent);
     final alertInfo = document.querySelector('.alert.alert-info strong');
-    
+
     if (alertInfo != null) {
       final totalText = _cleanText(alertInfo.text);
       return int.tryParse(totalText) ?? 0;
     }
-    
+
     return 0;
   }
 }

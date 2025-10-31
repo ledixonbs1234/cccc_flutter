@@ -37,158 +37,176 @@ class TimKiemView extends GetView<TimKiemController> {
             children: [
               // VNPost Account Card
               Obx(() => Card(
-                elevation: 2,
-                shadowColor: colorScheme.shadow.withOpacity(0.1),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Column(
-                  children: [
-                    // Header
-                    InkWell(
-                      onTap: controller.toggleAccountCard,
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: colorScheme.primaryContainer,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Icon(
-                                Icons.account_circle,
-                                color: colorScheme.onPrimaryContainer,
-                                size: 20,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Tài khoản VNPost',
-                                    style: theme.textTheme.titleSmall?.copyWith(
-                                      fontWeight: FontWeight.w600,
-                                      color: colorScheme.onSurface,
-                                    ),
+                    elevation: 2,
+                    shadowColor: colorScheme.shadow.withOpacity(0.1),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      children: [
+                        // Header
+                        InkWell(
+                          onTap: controller.toggleAccountCard,
+                          borderRadius: const BorderRadius.vertical(
+                              top: Radius.circular(16)),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.primaryContainer,
+                                    borderRadius: BorderRadius.circular(8),
                                   ),
-                                  if (controller.usernameController.text.isNotEmpty)
-                                    Text(
-                                      controller.usernameController.text,
-                                      style: theme.textTheme.bodySmall?.copyWith(
-                                        color: colorScheme.onSurfaceVariant,
+                                  child: Icon(
+                                    Icons.account_circle,
+                                    color: colorScheme.onPrimaryContainer,
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Tài khoản VNPost',
+                                        style: theme.textTheme.titleSmall
+                                            ?.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                          color: colorScheme.onSurface,
+                                        ),
+                                      ),
+                                      if (controller
+                                          .usernameController.text.isNotEmpty)
+                                        Text(
+                                          controller.usernameController.text,
+                                          style: theme.textTheme.bodySmall
+                                              ?.copyWith(
+                                            color: colorScheme.onSurfaceVariant,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                Icon(
+                                  controller.isAccountCardExpanded.value
+                                      ? Icons.keyboard_arrow_up
+                                      : Icons.keyboard_arrow_down,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        // Expandable content
+                        if (controller.isAccountCardExpanded.value)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                            child: Column(
+                              children: [
+                                const Divider(height: 1),
+                                const SizedBox(height: 16),
+                                // Username field
+                                TextField(
+                                  controller: controller.usernameController,
+                                  decoration: InputDecoration(
+                                    labelText: 'Tên đăng nhập',
+                                    hintText: 'Nhập tên đăng nhập VNPost',
+                                    prefixIcon: Icon(
+                                      Icons.person_outline,
+                                      color: colorScheme.primary,
+                                    ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(
+                                          color: colorScheme.outline),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(
+                                          color: colorScheme.outline),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(
+                                          color: colorScheme.primary, width: 2),
+                                    ),
+                                    filled: true,
+                                    fillColor: colorScheme.surface,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                // Password field
+                                Obx(() => TextField(
+                                      controller: controller.passwordController,
+                                      obscureText:
+                                          !controller.isPasswordVisible.value,
+                                      decoration: InputDecoration(
+                                        labelText: 'Mật khẩu',
+                                        hintText: 'Nhập mật khẩu VNPost',
+                                        prefixIcon: Icon(
+                                          Icons.lock_outline,
+                                          color: colorScheme.primary,
+                                        ),
+                                        suffixIcon: IconButton(
+                                          icon: Icon(
+                                            controller.isPasswordVisible.value
+                                                ? Icons.visibility_off
+                                                : Icons.visibility,
+                                            color: colorScheme.onSurfaceVariant,
+                                          ),
+                                          onPressed: controller
+                                              .togglePasswordVisibility,
+                                        ),
+                                        border: OutlineInputBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                          borderSide: BorderSide(
+                                              color: colorScheme.outline),
+                                        ),
+                                        enabledBorder: OutlineInputBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                          borderSide: BorderSide(
+                                              color: colorScheme.outline),
+                                        ),
+                                        focusedBorder: OutlineInputBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12),
+                                          borderSide: BorderSide(
+                                              color: colorScheme.primary,
+                                              width: 2),
+                                        ),
+                                        filled: true,
+                                        fillColor: colorScheme.surface,
+                                      ),
+                                    )),
+                                const SizedBox(height: 16),
+                                // Save button
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: FilledButton.icon(
+                                    onPressed: controller.saveCredentials,
+                                    icon: const Icon(Icons.save),
+                                    label: const Text('Lưu tài khoản'),
+                                    style: FilledButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 12),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
                                       ),
                                     ),
-                                ],
-                              ),
+                                  ),
+                                ),
+                              ],
                             ),
-                            Icon(
-                              controller.isAccountCardExpanded.value
-                                  ? Icons.keyboard_arrow_up
-                                  : Icons.keyboard_arrow_down,
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                          ],
-                        ),
-                      ),
+                          ),
+                      ],
                     ),
-                    // Expandable content
-                    if (controller.isAccountCardExpanded.value)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                        child: Column(
-                          children: [
-                            const Divider(height: 1),
-                            const SizedBox(height: 16),
-                            // Username field
-                            TextField(
-                              controller: controller.usernameController,
-                              decoration: InputDecoration(
-                                labelText: 'Tên đăng nhập',
-                                hintText: 'Nhập tên đăng nhập VNPost',
-                                prefixIcon: Icon(
-                                  Icons.person_outline,
-                                  color: colorScheme.primary,
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(color: colorScheme.outline),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(color: colorScheme.outline),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(color: colorScheme.primary, width: 2),
-                                ),
-                                filled: true,
-                                fillColor: colorScheme.surface,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            // Password field
-                            Obx(() => TextField(
-                              controller: controller.passwordController,
-                              obscureText: !controller.isPasswordVisible.value,
-                              decoration: InputDecoration(
-                                labelText: 'Mật khẩu',
-                                hintText: 'Nhập mật khẩu VNPost',
-                                prefixIcon: Icon(
-                                  Icons.lock_outline,
-                                  color: colorScheme.primary,
-                                ),
-                                suffixIcon: IconButton(
-                                  icon: Icon(
-                                    controller.isPasswordVisible.value
-                                        ? Icons.visibility_off
-                                        : Icons.visibility,
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
-                                  onPressed: controller.togglePasswordVisibility,
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(color: colorScheme.outline),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(color: colorScheme.outline),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(color: colorScheme.primary, width: 2),
-                                ),
-                                filled: true,
-                                fillColor: colorScheme.surface,
-                              ),
-                            )),
-                            const SizedBox(height: 16),
-                            // Save button
-                            SizedBox(
-                              width: double.infinity,
-                              child: FilledButton.icon(
-                                onPressed: controller.saveCredentials,
-                                icon: const Icon(Icons.save),
-                                label: const Text('Lưu tài khoản'),
-                                style: FilledButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(vertical: 12),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
-                ),
-              )),
+                  )),
 
               const SizedBox(height: 16),
 
@@ -272,7 +290,8 @@ class TimKiemView extends GetView<TimKiemController> {
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: colorScheme.primary, width: 2),
+                            borderSide: BorderSide(
+                                color: colorScheme.primary, width: 2),
                           ),
                           filled: true,
                           fillColor: colorScheme.surface,
@@ -292,15 +311,17 @@ class TimKiemView extends GetView<TimKiemController> {
                             Icons.calendar_today_outlined,
                             color: colorScheme.primary,
                           ),
-                          suffixIcon: controller.birthDateController.text.isNotEmpty
-                              ? IconButton(
-                                  icon: Icon(Icons.clear, color: colorScheme.onSurfaceVariant),
-                                  onPressed: () {
-                                    controller.birthDateController.clear();
-                                    controller.selectedDate = null;
-                                  },
-                                )
-                              : null,
+                          suffixIcon:
+                              controller.birthDateController.text.isNotEmpty
+                                  ? IconButton(
+                                      icon: Icon(Icons.clear,
+                                          color: colorScheme.onSurfaceVariant),
+                                      onPressed: () {
+                                        controller.birthDateController.clear();
+                                        controller.selectedDate = null;
+                                      },
+                                    )
+                                  : null,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                             borderSide: BorderSide(color: colorScheme.outline),
@@ -311,7 +332,8 @@ class TimKiemView extends GetView<TimKiemController> {
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: colorScheme.primary, width: 2),
+                            borderSide: BorderSide(
+                                color: colorScheme.primary, width: 2),
                           ),
                           filled: true,
                           fillColor: colorScheme.surface,
@@ -330,15 +352,18 @@ class TimKiemView extends GetView<TimKiemController> {
                               ),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(color: colorScheme.outline),
+                                borderSide:
+                                    BorderSide(color: colorScheme.outline),
                               ),
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(color: colorScheme.outline),
+                                borderSide:
+                                    BorderSide(color: colorScheme.outline),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(color: colorScheme.primary, width: 2),
+                                borderSide: BorderSide(
+                                    color: colorScheme.primary, width: 2),
                               ),
                               filled: true,
                               fillColor: colorScheme.surface,
@@ -368,7 +393,8 @@ class TimKiemView extends GetView<TimKiemController> {
                               icon: const Icon(Icons.clear_all),
                               label: const Text('Xóa'),
                               style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 16),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                 ),
@@ -379,18 +405,22 @@ class TimKiemView extends GetView<TimKiemController> {
                           Expanded(
                             flex: 2,
                             child: Obx(() => FilledButton.icon(
-                                  onPressed: controller.isSearching.value || controller.isLoggingIn.value
+                                  onPressed: controller.isSearching.value ||
+                                          controller.isLoggingIn.value
                                       ? null
                                       : () {
                                           controller.performWebSearch();
                                         },
-                                  icon: controller.isSearching.value || controller.isLoggingIn.value
+                                  icon: controller.isSearching.value ||
+                                          controller.isLoggingIn.value
                                       ? const SizedBox(
                                           width: 16,
                                           height: 16,
                                           child: CircularProgressIndicator(
                                             strokeWidth: 2,
-                                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                    Colors.white),
                                           ),
                                         )
                                       : const Icon(Icons.search),
@@ -402,7 +432,8 @@ class TimKiemView extends GetView<TimKiemController> {
                                             : 'Tìm Kiếm',
                                   ),
                                   style: FilledButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    padding: const EdgeInsets.symmetric(
+                                        vertical: 16),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(12),
                                     ),
@@ -474,11 +505,13 @@ class TimKiemView extends GetView<TimKiemController> {
                             physics: const NeverScrollableScrollPhysics(),
                             itemCount: controller.webSearchResults.length,
                             itemBuilder: (context, index) {
-                              final transaction = controller.webSearchResults[index];
+                              final transaction =
+                                  controller.webSearchResults[index];
                               return Container(
                                 margin: const EdgeInsets.only(bottom: 12),
                                 decoration: BoxDecoration(
-                                  color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                                  color: colorScheme.surfaceContainerHighest
+                                      .withOpacity(0.3),
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
                                     color: colorScheme.outline.withOpacity(0.3),
@@ -487,7 +520,8 @@ class TimKiemView extends GetView<TimKiemController> {
                                 child: Padding(
                                   padding: const EdgeInsets.all(16.0),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       // Row 1: STT and Status
                                       Row(
@@ -498,12 +532,15 @@ class TimKiemView extends GetView<TimKiemController> {
                                               vertical: 4,
                                             ),
                                             decoration: BoxDecoration(
-                                              color: colorScheme.primary.withOpacity(0.1),
-                                              borderRadius: BorderRadius.circular(8),
+                                              color: colorScheme.primary
+                                                  .withOpacity(0.1),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
                                             ),
                                             child: Text(
                                               'STT ${transaction.stt}',
-                                              style: theme.textTheme.bodySmall?.copyWith(
+                                              style: theme.textTheme.bodySmall
+                                                  ?.copyWith(
                                                 color: colorScheme.primary,
                                                 fontWeight: FontWeight.w600,
                                               ),
@@ -512,17 +549,22 @@ class TimKiemView extends GetView<TimKiemController> {
                                           const SizedBox(width: 12),
                                           Expanded(
                                             child: Container(
-                                              padding: const EdgeInsets.symmetric(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
                                                 horizontal: 8,
                                                 vertical: 4,
                                               ),
                                               decoration: BoxDecoration(
-                                                color: _getStatusColor(transaction.trangThai, colorScheme),
-                                                borderRadius: BorderRadius.circular(8),
+                                                color: _getStatusColor(
+                                                    transaction.trangThai,
+                                                    colorScheme),
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
                                               ),
                                               child: Text(
                                                 transaction.trangThai,
-                                                style: theme.textTheme.bodySmall?.copyWith(
+                                                style: theme.textTheme.bodySmall
+                                                    ?.copyWith(
                                                   color: Colors.white,
                                                   fontWeight: FontWeight.w600,
                                                 ),
@@ -532,7 +574,7 @@ class TimKiemView extends GetView<TimKiemController> {
                                         ],
                                       ),
                                       const SizedBox(height: 12),
-                                      
+
                                       // Row 2: Name
                                       Row(
                                         children: [
@@ -545,7 +587,8 @@ class TimKiemView extends GetView<TimKiemController> {
                                           Expanded(
                                             child: Text(
                                               transaction.hoTen,
-                                              style: theme.textTheme.titleSmall?.copyWith(
+                                              style: theme.textTheme.titleSmall
+                                                  ?.copyWith(
                                                 fontWeight: FontWeight.w600,
                                                 color: colorScheme.onSurface,
                                               ),
@@ -554,7 +597,7 @@ class TimKiemView extends GetView<TimKiemController> {
                                         ],
                                       ),
                                       const SizedBox(height: 8),
-                                      
+
                                       // Row 3: Postal Code with Copy Button
                                       Row(
                                         children: [
@@ -567,15 +610,18 @@ class TimKiemView extends GetView<TimKiemController> {
                                           Expanded(
                                             child: Text(
                                               'Mã bưu gửi: ${transaction.maBuuGui}',
-                                              style: theme.textTheme.bodyMedium?.copyWith(
-                                                color: colorScheme.onSurfaceVariant,
+                                              style: theme.textTheme.bodyMedium
+                                                  ?.copyWith(
+                                                color: colorScheme
+                                                    .onSurfaceVariant,
                                                 fontWeight: FontWeight.w500,
                                               ),
                                             ),
                                           ),
                                           IconButton(
                                             onPressed: () {
-                                              controller.copyPostalCode(transaction.maBuuGui);
+                                              controller.copyPostalCode(
+                                                  transaction.maBuuGui);
                                             },
                                             icon: Icon(
                                               Icons.copy,
@@ -584,33 +630,39 @@ class TimKiemView extends GetView<TimKiemController> {
                                             ),
                                             tooltip: 'Sao chép mã bưu gửi',
                                             style: IconButton.styleFrom(
-                                              backgroundColor: colorScheme.primaryContainer.withOpacity(0.5),
+                                              backgroundColor: colorScheme
+                                                  .primaryContainer
+                                                  .withOpacity(0.5),
                                               padding: const EdgeInsets.all(8),
                                             ),
                                           ),
                                         ],
                                       ),
-                                      
-                                      if (transaction.cuocChuyenPhat.isNotEmpty) ...[
+
+                                      if (transaction
+                                          .cuocChuyenPhat.isNotEmpty) ...[
                                         const SizedBox(height: 8),
                                         Row(
                                           children: [
                                             Icon(
                                               Icons.attach_money,
                                               size: 18,
-                                              color: colorScheme.onSurfaceVariant,
+                                              color:
+                                                  colorScheme.onSurfaceVariant,
                                             ),
                                             const SizedBox(width: 8),
                                             Text(
                                               'Cước: ${transaction.cuocChuyenPhat} đ',
-                                              style: theme.textTheme.bodySmall?.copyWith(
-                                                color: colorScheme.onSurfaceVariant,
+                                              style: theme.textTheme.bodySmall
+                                                  ?.copyWith(
+                                                color: colorScheme
+                                                    .onSurfaceVariant,
                                               ),
                                             ),
                                           ],
                                         ),
                                       ],
-                                      
+
                                       if (transaction.ngayTao.isNotEmpty) ...[
                                         const SizedBox(height: 8),
                                         Row(
@@ -618,13 +670,16 @@ class TimKiemView extends GetView<TimKiemController> {
                                             Icon(
                                               Icons.calendar_today,
                                               size: 18,
-                                              color: colorScheme.onSurfaceVariant,
+                                              color:
+                                                  colorScheme.onSurfaceVariant,
                                             ),
                                             const SizedBox(width: 8),
                                             Text(
                                               transaction.ngayTao,
-                                              style: theme.textTheme.bodySmall?.copyWith(
-                                                color: colorScheme.onSurfaceVariant,
+                                              style: theme.textTheme.bodySmall
+                                                  ?.copyWith(
+                                                color: colorScheme
+                                                    .onSurfaceVariant,
                                               ),
                                             ),
                                           ],
@@ -656,7 +711,8 @@ class TimKiemView extends GetView<TimKiemController> {
       return Colors.orange;
     } else if (status.contains('Xác nhận') || status.contains('Xác Nhận')) {
       return Colors.green;
-    } else if (status.contains('In phong bì') || status.contains('In Phong Bì')) {
+    } else if (status.contains('In phong bì') ||
+        status.contains('In Phong Bì')) {
       return Colors.blue;
     } else if (status.contains('Xuất Portal') || status.contains('Portal')) {
       return Colors.purple;

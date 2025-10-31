@@ -32,7 +32,7 @@ class VNPostService {
         // Extract just the cookie value before first semicolon
         return cookie.split(';')[0].trim();
       }).join('; ');
-      
+
       _storage.write(_cookieKey, cookies);
       print('Saved cookies: $cookies');
     }
@@ -44,7 +44,8 @@ class VNPostService {
   }
 
   // Add cookies to request headers
-  Map<String, String> _getHeaders({bool includeFormData = false, String? referer}) {
+  Map<String, String> _getHeaders(
+      {bool includeFormData = false, String? referer}) {
     final headers = {
       'accept':
           'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
@@ -106,7 +107,8 @@ class VNPostService {
   }
 
   // Login to VNPost
-  Future<bool> login({required String username, required String password}) async {
+  Future<bool> login(
+      {required String username, required String password}) async {
     try {
       // Get CSRF token first
       final token = await _getCsrfToken();
@@ -127,7 +129,7 @@ class VNPostService {
       );
 
       _saveCookies(response);
-      
+
       print('Login response status: ${response.statusCode}');
 
       // Check if login successful (302 redirect or 200)
@@ -147,18 +149,18 @@ class VNPostService {
             print('Followed redirect to: $redirectUrl');
           }
         }
-        
+
         // Verify login by checking if we can access a protected page
         final verifyResponse = await _client.get(
           Uri.parse(searchUrl),
           headers: _getHeaders(referer: loginUrl),
         );
         _saveCookies(verifyResponse);
-        
+
         // Check if response is not login page
-        final isLoginPage = verifyResponse.body.contains('Đăng Nhập') || 
-                           verifyResponse.body.contains('Tên tài khoản');
-        
+        final isLoginPage = verifyResponse.body.contains('Đăng Nhập') ||
+            verifyResponse.body.contains('Tên tài khoản');
+
         if (!isLoginPage) {
           print('Login verified successfully');
           return true;
@@ -212,9 +214,9 @@ class VNPostService {
       print('Search response status: ${response.statusCode}');
 
       // Check if response is login page (even with 200 status)
-      final isLoginPage = response.body.contains('Đăng Nhập') || 
-                         response.body.contains('Tên tài khoản') ||
-                         response.body.contains('PHẦN MỀM HỖ TRỢ ĐĂNG KÝ');
+      final isLoginPage = response.body.contains('Đăng Nhập') ||
+          response.body.contains('Tên tài khoản') ||
+          response.body.contains('PHẦN MỀM HỖ TRỢ ĐĂNG KÝ');
 
       if (isLoginPage) {
         print('Detected login page - needs authentication');
