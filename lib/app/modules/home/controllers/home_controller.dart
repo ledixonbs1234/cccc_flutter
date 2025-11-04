@@ -105,7 +105,6 @@ class HomeController extends GetxController {
   void showStatusMessage(String message, StatusType type) {
     statusMessage.value = message;
     statusType.value = type;
-    lastOperationTime.value = DateTime.now();
 
     // Auto clear status after 5 seconds
     Timer(const Duration(seconds: 5), () {

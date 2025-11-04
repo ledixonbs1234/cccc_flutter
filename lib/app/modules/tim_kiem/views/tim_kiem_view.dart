@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import '../controllers/tim_kiem_controller.dart';
 
@@ -80,9 +81,9 @@ class TimKiemView extends GetView<TimKiemController> {
                                         ),
                                       ),
                                       if (controller
-                                          .usernameController.text.isNotEmpty)
+                                          .userCurrent.value.isNotEmpty)
                                         Text(
-                                          controller.usernameController.text,
+                                          controller.userCurrent.value,
                                           style: theme.textTheme.bodySmall
                                               ?.copyWith(
                                             color: colorScheme.onSurfaceVariant,
@@ -299,14 +300,21 @@ class TimKiemView extends GetView<TimKiemController> {
                       ),
                       const SizedBox(height: 16),
 
-                      // Birth date field
+                      // Birth date field - Number input with auto-formatting
                       TextField(
                         controller: controller.birthDateController,
-                        readOnly: true,
-                        onTap: () => controller.pickBirthDate(context),
+                        keyboardType: TextInputType.number,
+                        maxLength: 10, // DD/MM/YYYY
                         decoration: InputDecoration(
-                          labelText: 'Ngày sinh (dd-MM-yyyy)',
-                          hintText: 'Chọn ngày sinh',
+                          labelText: 'Ngày sinh (DD/MM/YYYY)',
+                          hintText: 'Nhập ngày sinh, VD: 09122025',
+                          counterText: '', // Hide counter
+                          helperText:
+                              'Nhập 8 chữ số, tự động format DD/MM/YYYY',
+                          helperStyle: TextStyle(
+                            color: colorScheme.onSurfaceVariant,
+                            fontSize: 11,
+                          ),
                           prefixIcon: Icon(
                             Icons.calendar_today_outlined,
                             color: colorScheme.primary,
@@ -316,10 +324,7 @@ class TimKiemView extends GetView<TimKiemController> {
                                   ? IconButton(
                                       icon: Icon(Icons.clear,
                                           color: colorScheme.onSurfaceVariant),
-                                      onPressed: () {
-                                        controller.birthDateController.clear();
-                                        controller.selectedDate = null;
-                                      },
+                                      onPressed: controller.clearBirthDate,
                                     )
                                   : null,
                           border: OutlineInputBorder(
@@ -596,6 +601,65 @@ class TimKiemView extends GetView<TimKiemController> {
                                           ),
                                         ],
                                       ),
+
+                                      // Row 2.5: Số CCCD (if available)
+                                      if (transaction.soCCCD.isNotEmpty) ...[
+                                        const SizedBox(height: 8),
+                                        Row(
+                                          children: [
+                                            Icon(
+                                              Icons.credit_card,
+                                              size: 18,
+                                              color:
+                                                  colorScheme.onSurfaceVariant,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Expanded(
+                                              child: Text(
+                                                'Số CCCD: ${transaction.soCCCD}',
+                                                style: theme
+                                                    .textTheme.bodyMedium
+                                                    ?.copyWith(
+                                                  color: colorScheme.primary,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ),
+                                            IconButton(
+                                              onPressed: () {
+                                                Clipboard.setData(ClipboardData(
+                                                    text: transaction.soCCCD));
+                                                Get.snackbar(
+                                                  'Đã sao chép',
+                                                  'Số CCCD ${transaction.soCCCD} đã được sao chép',
+                                                  snackPosition:
+                                                      SnackPosition.BOTTOM,
+                                                  backgroundColor: Colors.green,
+                                                  colorText: Colors.white,
+                                                  duration: const Duration(
+                                                      seconds: 1),
+                                                  icon: const Icon(
+                                                      Icons.check_circle,
+                                                      color: Colors.white),
+                                                );
+                                              },
+                                              icon: Icon(
+                                                Icons.copy,
+                                                size: 18,
+                                                color: colorScheme.primary,
+                                              ),
+                                              tooltip: 'Sao chép số CCCD',
+                                              style: IconButton.styleFrom(
+                                                backgroundColor: colorScheme
+                                                    .primaryContainer
+                                                    .withOpacity(0.5),
+                                                padding:
+                                                    const EdgeInsets.all(8),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
                                       const SizedBox(height: 8),
 
                                       // Row 3: Postal Code with Copy Button

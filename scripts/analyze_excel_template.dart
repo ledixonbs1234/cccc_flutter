@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:excel/excel.dart';
 
 void main() async {
@@ -15,7 +14,7 @@ void main() async {
     final excel = Excel.decodeBytes(bytes);
 
     print('=== CC.XLSX TEMPLATE ANALYSIS ===\n');
-    
+
     // Analyze each sheet
     for (String sheetName in excel.tables.keys) {
       final sheet = excel.tables[sheetName]!;
@@ -27,7 +26,8 @@ void main() async {
       // Print headers (first row)
       print('Headers (Row 1):');
       for (int col = 0; col < sheet.maxColumns; col++) {
-        final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: 0));
+        final cell = sheet
+            .cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: 0));
         final value = cell.value?.toString() ?? '';
         print('  Column $col: "$value"');
       }
@@ -36,10 +36,13 @@ void main() async {
       // Print first few data rows if they exist
       if (sheet.maxRows > 1) {
         print('Sample Data Rows:');
-        for (int row = 1; row < (sheet.maxRows > 5 ? 5 : sheet.maxRows); row++) {
+        for (int row = 1;
+            row < (sheet.maxRows > 5 ? 5 : sheet.maxRows);
+            row++) {
           print('  Row ${row + 1}:');
           for (int col = 0; col < sheet.maxColumns; col++) {
-            final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row));
+            final cell = sheet.cell(
+                CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row));
             final value = cell.value?.toString() ?? '';
             print('    Column $col: "$value"');
           }
@@ -49,8 +52,11 @@ void main() async {
 
       // Check for any formatting or styles
       print('Cell Formatting Analysis:');
-      for (int col = 0; col < (sheet.maxColumns > 10 ? 10 : sheet.maxColumns); col++) {
-        final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: 0));
+      for (int col = 0;
+          col < (sheet.maxColumns > 10 ? 10 : sheet.maxColumns);
+          col++) {
+        final cell = sheet
+            .cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: 0));
         if (cell.cellStyle != null) {
           print('  Column $col has custom styling');
         }
@@ -70,7 +76,6 @@ void main() async {
     print('Column 6: Mã bưu gửi (maBuuGui)');
     print('Column 7: Ngày làm CCCD (NgayLamCCCD) - if available');
     print('');
-
   } catch (e) {
     print('Error analyzing Excel template: $e');
   }

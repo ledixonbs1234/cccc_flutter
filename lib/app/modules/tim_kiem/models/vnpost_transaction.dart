@@ -6,6 +6,7 @@ class VNPostTransaction {
   final String cuocChuyenPhat;
   final String maThuTuc;
   final String ngayTao;
+  final String soCCCD; // Mã Hồ Sơ = Số CCCD
 
   VNPostTransaction({
     required this.stt,
@@ -15,6 +16,7 @@ class VNPostTransaction {
     required this.cuocChuyenPhat,
     required this.maThuTuc,
     required this.ngayTao,
+    required this.soCCCD,
   });
 
   // Factory constructor to create from parsed HTML data
@@ -27,6 +29,7 @@ class VNPostTransaction {
       cuocChuyenPhat: data['cuocChuyenPhat'] ?? '',
       maThuTuc: data['maThuTuc'] ?? '',
       ngayTao: data['ngayTao'] ?? '',
+      soCCCD: data['soCCCD'] ?? '', // Lấy từ Mã Hồ Sơ
     );
   }
 }

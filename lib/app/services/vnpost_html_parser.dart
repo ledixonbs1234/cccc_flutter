@@ -34,6 +34,9 @@ class VNPostHtmlParser {
           final maBuuGui = _cleanText(cells[4].text);
           final cuocChuyenPhat = _cleanText(cells[5].text);
 
+          // Get Mã Hồ Sơ (Số CCCD) - index 11
+          final soCCCD = cells.length > 11 ? _cleanText(cells[11].text) : '';
+
           // Get procedure info (index 12)
           final maThuTuc = cells.length > 12 ? _cleanText(cells[12].text) : '';
 
@@ -48,6 +51,7 @@ class VNPostHtmlParser {
             cuocChuyenPhat: cuocChuyenPhat,
             maThuTuc: maThuTuc,
             ngayTao: ngayTao,
+            soCCCD: soCCCD,
           );
 
           transactions.add(transaction);
