@@ -25,7 +25,7 @@ class CccdErrorView extends GetView<CccdErrorController> {
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () {
-                      controller.syncErrorCCCDsToFirebase();
+                      controller.loadErrorCCCDsFromFirebase();
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
@@ -110,46 +110,6 @@ class CccdErrorView extends GetView<CccdErrorController> {
             ),
 
             const SizedBox(height: 8.0),
-
-            // Auto Sync Toggle Row
-            Row(
-              children: [
-                Expanded(
-                  child: Obx(() => ElevatedButton(
-                    onPressed: () {
-                      controller.toggleAutoSync();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: controller.autoSyncEnabled.value 
-                          ? Colors.green
-                          : Colors.grey,
-                      foregroundColor: Colors.white,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(controller.autoSyncEnabled.value 
-                            ? Icons.sync 
-                            : Icons.sync_disabled),
-                        const SizedBox(width: 8.0),
-                        Flexible(
-                          child: Text(
-                            controller.autoSyncEnabled.value 
-                                ? 'Auto Sync: ON'
-                                : 'Auto Sync: OFF',
-                            style: const TextStyle(fontSize: 13),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 8.0),
-
             // Third Action Buttons Row - Firebase Status
             Row(
               children: [
@@ -195,7 +155,8 @@ class CccdErrorView extends GetView<CccdErrorController> {
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.error, color: Colors.red, size: 20.0),
+                          const Icon(Icons.error,
+                              color: Colors.red, size: 20.0),
                           const SizedBox(width: 8.0),
                           Text(
                             'Tổng số CCCD lỗi: ${controller.errorCCCDList.length}',
@@ -207,45 +168,23 @@ class CccdErrorView extends GetView<CccdErrorController> {
                         const SizedBox(height: 8.0),
                         Row(
                           children: [
-                            const Icon(Icons.list, color: Colors.blue, size: 20.0),
+                            const Icon(Icons.list,
+                                color: Colors.blue, size: 20.0),
                             const SizedBox(width: 8.0),
                             Text(
                               'Vị trí hiện tại: ${controller.currentIndex.value + 1}/${controller.totalCCCDList.length}',
-                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: Colors.blue.shade700,
-                                fontWeight: FontWeight.w500,
-                              ),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(
+                                    color: Colors.blue.shade700,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                             ),
                           ],
                         ),
                       ],
                       const SizedBox(height: 8.0),
-                      Row(
-                        children: [
-                          Icon(
-                            controller.autoSyncEnabled.value 
-                                ? Icons.sync 
-                                : Icons.sync_disabled,
-                            color: controller.autoSyncEnabled.value 
-                                ? Colors.green 
-                                : Colors.grey,
-                            size: 20.0,
-                          ),
-                          const SizedBox(width: 8.0),
-                          Text(
-                            'Auto Sync: ${controller.autoSyncEnabled.value ? "ON" : "OFF"}',
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
-                                ?.copyWith(
-                                  color: controller.autoSyncEnabled.value 
-                                      ? Colors.green.shade700
-                                      : Colors.grey.shade600,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                          ),
-                        ],
-                      ),
                     ],
                   ),
                 ),
@@ -291,11 +230,12 @@ class CccdErrorView extends GetView<CccdErrorController> {
                     itemCount: controller.errorCCCDList.length,
                     itemBuilder: (context, index) {
                       final cccd = controller.errorCCCDList[index];
-                      
+
                       // Get position in total list using helper method
-                      final positionInTotalList = controller.getPositionInTotalList(cccd);
+                      final positionInTotalList =
+                          controller.getPositionInTotalList(cccd);
                       final totalCount = controller.getTotalCCCDCount();
-                      
+
                       return Card(
                         margin: const EdgeInsets.symmetric(vertical: 4.0),
                         child: ListTile(

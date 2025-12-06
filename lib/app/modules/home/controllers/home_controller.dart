@@ -10,6 +10,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:get/get.dart';
 
 import '../../../managers/fireabaseManager.dart';
+import '../../../services/firebase_queue_service.dart';
 import '../models/MessageModel.dart';
 import '../models/cccdInfo.dart';
 
@@ -19,11 +20,26 @@ class HomeController extends GetxController {
   final count = 0.obs;
   final nameCurrent = "".obs;
   final isRunning = false.obs;
+
+  // ✅ totalCCCD bây giờ được sync từ Firebase queue
   final totalCCCD = <CCCDInfo>[].obs;
+
   final indexCurrent = 0.obs;
   final isAutoRun = false.obs;
   final errorCCCDList = <CCCDInfo>[].obs;
   final currentPostalCode = "".obs;
+
+  // ✅ Firebase Queue Service
+  final _queueService = FirebaseQueueService();
+
+  // ✅ Queue statistics
+  final queueStats = <String, int>{
+    'total': 0,
+    'pending': 0,
+    'processing': 0,
+    'completed': 0,
+    'error': 0,
+  }.obs;
 
   // NotFound retry tracking
   String? _lastNotFoundCCCDName;
@@ -57,6 +73,32 @@ class HomeController extends GetxController {
   final statusType = StatusType.none.obs;
   final lastOperationTime = DateTime.now().obs;
 
+  // ✅ Stream subscriptions for Firebase listeners
+  StreamSubscription? _queueSubscription;
+  StreamSubscription? _indexSubscription;
+  StreamSubscription? _autoRunSubscription;
+
+  // ✅ UI Display Getters (1-based indexing for user display)
+  /// Get current position for UI display (1-based)
+  int get currentPosition => indexCurrent.value + 1;
+
+  /// Get total count for UI display
+  int get totalPosition => totalCCCD.length;
+
+  /// Get formatted position string for UI (e.g., "5/20")
+  String get positionDisplay {
+    if (totalCCCD.isEmpty) return '0/0';
+    return '$currentPosition/$totalPosition';
+  }
+
+  /// Get current CCCD display with position and name
+  String get cccdNumberDisplay {
+    if (indexCurrent.value >= 0 && indexCurrent.value < totalCCCD.length) {
+      return '#$currentPosition - ${totalCCCD[indexCurrent.value].Name}';
+    }
+    return 'Không có CCCD';
+  }
+
   @override
   void onInit() {
     super.onInit();
@@ -68,7 +110,102 @@ class HomeController extends GetxController {
     // Initialize Firebase key
     _initializeFirebaseKey();
 
+    // ✅ Setup Firebase Queue listeners
+    _setupFirebaseQueueListeners();
+
     // totalCCCD.addAll(generateRandomCCCDData(50));
+  }
+
+  /// ✅ Setup Firebase Queue listeners để sync với Chrome Extension
+  void _setupFirebaseQueueListeners() {
+    // Listen to CCCD queue changes
+    _queueSubscription = _queueService.watchCCCDQueue().listen((cccdList) {
+      totalCCCD.value = cccdList;
+
+      // ✅ Auto sync error CCCDs
+      syncErrorCCCDs();
+
+      // Update current name if valid index
+      if (indexCurrent.value >= 0 && indexCurrent.value < cccdList.length) {
+        nameCurrent.value = cccdList[indexCurrent.value].Name;
+      } else if (cccdList.isEmpty) {
+        nameCurrent.value = "";
+        indexCurrent.value = 0;
+      }
+
+      print('📊 Queue updated: ${cccdList.length} CCCDs');
+    }, onError: (error) {
+      print('❌ Queue listener error: $error');
+      showErrorMessage('Lỗi đồng bộ queue: $error');
+    });
+
+    // Listen to currentIndex changes from Extension
+    _indexSubscription = _queueService.watchCurrentIndex().listen((index) {
+      indexCurrent.value = index;
+
+      // Update current name
+      if (index >= 0 && index < totalCCCD.length) {
+        nameCurrent.value = totalCCCD[index].Name;
+      }
+
+      print('📍 Current index updated: $index');
+    }, onError: (error) {
+      print('❌ Index listener error: $error');
+    });
+
+    // Listen to auto-run state changes
+    _autoRunSubscription = _queueService.watchAutoRunState().listen((isAuto) {
+      final previousState = isAutoRun.value;
+      isAutoRun.value = isAuto;
+
+      print('🚀 Auto-run state updated: $previousState → $isAuto');
+
+      // Only show message if state actually changed
+      if (previousState != isAuto) {
+        if (isAuto) {
+          showInfoMessage('Extension đã bật auto-run');
+
+          // ✅ Tự động bắt đầu xử lý CCCD khi auto được bật
+          if (totalCCCD.isNotEmpty && !isSending) {
+            print('🚀 Auto-run enabled, starting processCCCD...');
+            // processCCCD();
+          }
+        } else {
+          showInfoMessage('Extension đã tắt auto-run');
+          // Stop processing khi tắt auto
+          isSending = false;
+        }
+      }
+    }, onError: (error) {
+      print('❌ Auto-run listener error: $error');
+    });
+
+    // ✅ Force sync auto-run state on startup
+    _syncAutoRunStateFromFirebase();
+
+    // Refresh queue stats periodically
+    _refreshQueueStats();
+    Timer.periodic(const Duration(seconds: 5), (timer) {
+      if (!timer.isActive) return;
+      _refreshQueueStats();
+    });
+  }
+
+  /// ✅ Force sync auto-run state from Firebase
+  Future<void> _syncAutoRunStateFromFirebase() async {
+    try {
+      final currentState = await _queueService.getAutoRunState();
+      print('🔄 Force sync auto-run state: $currentState');
+      isAutoRun.value = currentState;
+    } catch (e) {
+      print('❌ Error syncing auto-run state: $e');
+    }
+  }
+
+  /// ✅ Refresh queue statistics
+  Future<void> _refreshQueueStats() async {
+    final stats = await _queueService.getQueueStats();
+    queueStats.value = stats;
   }
 
   void _initializeFirebaseKey() {
@@ -411,7 +548,8 @@ class HomeController extends GetxController {
   }
 
   /// Process captured barcode from mobile scanner
-  void _processCapturedBarcode(String barcodeData) {
+  /// ✅ Updated to add CCCD to Firebase queue
+  void _processCapturedBarcode(String barcodeData) async {
     try {
       String barcodeFilled = barcodeData.trim().toUpperCase();
       List<String> textSplit = barcodeFilled.split('|');
@@ -433,24 +571,27 @@ class HomeController extends GetxController {
         cccdInfo.maBuuGui =
             currentPostalCode.value.isNotEmpty ? currentPostalCode.value : null;
 
-        if (!isAutoRun.value) {
-          sendCCCD(cccdInfo);
-          // Phát âm thanh thông báo
+        // ✅ Set queue fields
+        cccdInfo.index = totalCCCD.length;
+        cccdInfo.status = 'pending';
+        cccdInfo.createdAt = DateTime.now().toIso8601String();
+
+        // ✅ Check for duplicates based on ID
+        final exists = totalCCCD.any((cccd) => cccd.Id == cccdInfo.Id);
+        if (exists) {
+          showWarningMessage('CCCD ${cccdInfo.Id} đã tồn tại trong queue');
           _playBeepSound();
-        } else {
-          // Check existing cccd has same ID
-          CCCDInfo? existingCCCD =
-              totalCCCD.firstWhereOrNull((cccd) => cccd.Id == cccdInfo.Id);
-          if (existingCCCD == null) {
-            totalCCCD.add(cccdInfo);
-          }
-          // Always play beep sound
-          _playBeepSound();
+          return;
         }
 
-        // Nếu isAutoRun bật và không có yêu cầu đang gửi, bắt đầu xử lý hàng đợi
-        if (isAutoRun.value && !isSending) {
-          processCCCD();
+        // ✅ Add to Firebase queue
+        final key = await _queueService.addCCCDToQueue(cccd: cccdInfo);
+
+        if (key != null) {
+          _playBeepSound();
+          showSuccessMessage('Đã thêm: ${cccdInfo.Name}');
+        } else {
+          showErrorMessage('Không thể thêm CCCD vào queue');
         }
       } else {
         // Invalid barcode format
@@ -464,6 +605,7 @@ class HomeController extends GetxController {
   }
 
   /// Test function that simulates capture() with random barcode data
+  /// ✅ Updated to add CCCD to Firebase queue
   Future<void> testCapture() async {
     try {
       // Generate random barcode data similar to real CCCD format
@@ -488,24 +630,20 @@ class HomeController extends GetxController {
         cccdInfo.maBuuGui =
             currentPostalCode.value.isNotEmpty ? currentPostalCode.value : null;
 
-        if (!isAutoRun.value) {
-          sendCCCD(cccdInfo);
+        // ✅ Set queue fields
+        cccdInfo.index = totalCCCD.length; // Will be set properly by service
+        cccdInfo.status = 'pending';
+        cccdInfo.createdAt = DateTime.now().toIso8601String();
+
+        // ✅ Add to Firebase queue instead of local list
+        final key = await _queueService.addCCCDToQueue(cccd: cccdInfo);
+
+        if (key != null) {
           // Phát âm thanh thông báo
           _playBeepSound();
+          showSuccessMessage('Đã thêm CCCD test vào queue: ${cccdInfo.Name}');
         } else {
-          // Check existing cccd has same ID (not maBuuGui to allow more variety)
-          CCCDInfo? existingCCCD =
-              totalCCCD.firstWhereOrNull((cccd) => cccd.Id == cccdInfo.Id);
-          if (existingCCCD == null) {
-            totalCCCD.add(cccdInfo);
-          }
-          // Always play beep sound in test mode regardless of duplicate
-          _playBeepSound();
-        }
-
-        // Nếu isAutoRun bật và không có yêu cầu đang gửi, bắt đầu xử lý hàng đợi
-        if (isAutoRun.value && !isSending) {
-          processCCCD();
+          showErrorMessage('Không thể thêm CCCD vào queue');
         }
       }
     } catch (e) {
@@ -858,6 +996,11 @@ class HomeController extends GetxController {
 
   @override
   void onClose() {
+    // ✅ Cancel Firebase subscriptions
+    _queueSubscription?.cancel();
+    _indexSubscription?.cancel();
+    _autoRunSubscription?.cancel();
+
     _disposeMobileScannerController();
     postalCodeController.dispose();
     searchController.dispose();
@@ -958,38 +1101,76 @@ class HomeController extends GetxController {
     }
   }
 
-  void deleteData() {
-    FirebaseManager().rootPath.child("listcccd").remove();
+  /// ✅ Delete all data - Clear Firebase queue
+  void deleteData() async {
+    // Clear Firebase queue
+    await _queueService.clearQueue();
+
+    // Local data will be cleared by Firebase listener
+    // But clear immediately for UI responsiveness
     totalCCCD.clear();
+
     isAutoRun.value = false;
     isSending = false;
-
     indexCurrent.value = 0;
-
     nameCurrent.value = "";
+
+    showSuccessMessage('Đã xóa tất cả dữ liệu');
     update();
   }
 
-  void previousCCCD() {
-    if (isSending) return;
-    //decrease totalCCCD down 1
-    if (indexCurrent.value == 0) return;
-    indexCurrent.value = indexCurrent.value - 1;
-    nameCurrent.value = totalCCCD[indexCurrent.value].Name;
-    if (isRunning.value) {
-      sendCCCD(totalCCCD[indexCurrent.value]);
+  /// ✅ Navigate to previous CCCD - CHỈ hoạt động khi auto OFF
+  void previousCCCD() async {
+    // ✅ Block when auto-run is ON
+    if (isAutoRun.value) {
+      showWarningMessage('Không thể điều khiển thủ công khi auto đang bật');
+      return;
     }
+
+    if (isSending) return;
+
+    // Decrease index
+    if (indexCurrent.value == 0) {
+      showInfoMessage('Đã ở đầu danh sách');
+      return;
+    }
+
+    final newIndex = indexCurrent.value - 1;
+
+    // ✅ Update Firebase currentIndex
+    await _queueService.updateCurrentIndex(newIndex);
+
+    // indexCurrent will be updated by Firebase listener
+    nameCurrent.value = totalCCCD[newIndex].Name;
+
+    showInfoMessage('Chuyển về: ${totalCCCD[newIndex].Name}');
   }
 
-  void nextCCCD() {
-    if (isSending) return; // Không cho phép gửi tiếp khi đang gửi
-    //decrease totalCCCD down 1
-    if (indexCurrent.value == totalCCCD.length - 1) return;
-    indexCurrent.value = indexCurrent.value + 1;
-    nameCurrent.value = totalCCCD[indexCurrent.value].Name;
-    if (isRunning.value) {
-      sendCCCD(totalCCCD[indexCurrent.value]);
+  /// ✅ Navigate to next CCCD - CHỈ hoạt động khi auto OFF
+  void nextCCCD() async {
+    // ✅ Block when auto-run is ON
+    if (isAutoRun.value) {
+      showWarningMessage('Không thể điều khiển thủ công khi auto đang bật');
+      return;
     }
+
+    if (isSending) return;
+
+    // Increase index
+    if (indexCurrent.value == totalCCCD.length - 1) {
+      showInfoMessage('Đã ở cuối danh sách');
+      return;
+    }
+
+    final newIndex = indexCurrent.value + 1;
+
+    // ✅ Update Firebase currentIndex
+    await _queueService.updateCurrentIndex(newIndex);
+
+    // indexCurrent will be updated by Firebase listener
+    nameCurrent.value = totalCCCD[newIndex].Name;
+
+    showInfoMessage('Chuyển đến: ${totalCCCD[newIndex].Name}');
   }
 
   void resendCurrentCCCD() {
@@ -1003,8 +1184,17 @@ class HomeController extends GetxController {
     }
   }
 
-  void sendAutoRunToFirebase(bool isAuto) {
-    FirebaseManager().sendAutoRunToFirebase(isAuto);
+  /// ✅ Update auto-run state to Firebase
+  /// Let Firebase listener update isAutoRun.value
+  void sendAutoRunToFirebase(bool value) async {
+    final success = await _queueService.setAutoRunState(value);
+    if (success) {
+      print('Auto-run updated successfully');
+      // ❌ KHÔNG set manual: isAutoRun.value = value
+      // Để listener update tự động
+    } else {
+      Get.snackbar('Lỗi', 'Không thể cập nhật auto-run');
+    }
   }
 
   void onListenNotification(MessageReceiveModel message) {
@@ -1016,12 +1206,12 @@ class HomeController extends GetxController {
       // Reset notFound tracking on successful processing
       _resetNotFoundTracking();
 
-      isSending = false;
-      if (isAutoRun.value) {
-        indexCurrent.value++;
-        // Sau khi nhận được tín hiệu hoàn thành và tăng index, gọi lại processCCCD để xử lý mục tiếp theo
-        processCCCD();
-      }
+      // isSending = false;
+      // if (isAutoRun.value) {
+      //   indexCurrent.value++;
+      //   // Sau khi nhận được tín hiệu hoàn thành và tăng index, gọi lại processCCCD để xử lý mục tiếp theo
+      //   processCCCD();
+      // }
     } else if (message.Lenh == "notFound") {
       _handleNotFoundMessage(message.DoiTuong);
     } else if (message.Lenh == "sendMaHieu") {
@@ -1774,5 +1964,97 @@ class HomeController extends GetxController {
       return 'Chưa cấu hình key';
     }
     return 'Key: ${currentFirebaseKey.value}';
+  }
+
+  // ✅ Helper methods for queue management
+
+  /// Get pending CCCDs count
+  int get pendingCount => queueStats['pending'] ?? 0;
+
+  /// Get processing CCCDs count
+  int get processingCount => queueStats['processing'] ?? 0;
+
+  /// Get completed CCCDs count
+  int get completedCount => queueStats['completed'] ?? 0;
+
+  /// Get error CCCDs count
+  int get errorCount => queueStats['error'] ?? 0;
+
+  /// Get total CCCDs count
+  int get totalCount => queueStats['total'] ?? 0;
+
+  /// Check if queue is empty
+  bool get isQueueEmpty => totalCCCD.isEmpty;
+
+  /// Check if can navigate (auto must be OFF)
+  bool get canNavigate => !isAutoRun.value;
+
+  /// Get current CCCD info
+  CCCDInfo? get currentCCCD {
+    if (indexCurrent.value >= 0 && indexCurrent.value < totalCCCD.length) {
+      return totalCCCD[indexCurrent.value];
+    }
+    return null;
+  }
+
+  /// Get queue progress percentage
+  double get queueProgress {
+    if (totalCount == 0) return 0.0;
+    return (completedCount + errorCount) / totalCount;
+  }
+
+  /// Test method - Add multiple random CCCDs to queue
+  Future<void> testAddMultipleCCCDs(int count) async {
+    showInfoMessage('Đang thêm $count CCCD test...');
+
+    for (int i = 0; i < count; i++) {
+      await testCapture();
+      // Small delay to ensure unique timestamps
+      await Future.delayed(const Duration(milliseconds: 10));
+    }
+
+    showSuccessMessage('Đã thêm $count CCCD vào queue');
+  }
+
+  /// Clear completed CCCDs from queue
+  Future<void> clearCompletedCCCDs() async {
+    try {
+      int removedCount = 0;
+
+      for (final cccd in totalCCCD) {
+        if (cccd.isCompleted && cccd.firebaseKey != null) {
+          await _queueService.removeCCCD(cccd.firebaseKey!);
+          removedCount++;
+        }
+      }
+
+      if (removedCount > 0) {
+        showSuccessMessage('Đã xóa $removedCount CCCD hoàn thành');
+      } else {
+        showInfoMessage('Không có CCCD hoàn thành để xóa');
+      }
+    } catch (e) {
+      showErrorMessage('Lỗi xóa CCCD hoàn thành: $e');
+    }
+  }
+
+  /// Sync error CCCDs from queue to local error list
+  void syncErrorCCCDs() {
+    errorCCCDList.clear();
+
+    for (final cccd in totalCCCD) {
+      if (cccd.isError) {
+        errorCCCDList.add(cccd);
+      }
+    }
+
+    print('📋 Synced ${errorCCCDList.length} error CCCDs');
+  }
+
+  /// ✅ Manual refresh auto-run state from Firebase (for debugging)
+  Future<void> refreshAutoRunState() async {
+    await _syncAutoRunStateFromFirebase();
+    showInfoMessage(
+        'Đã làm mới trạng thái auto-run: ${isAutoRun.value ? "ON" : "OFF"}');
   }
 }

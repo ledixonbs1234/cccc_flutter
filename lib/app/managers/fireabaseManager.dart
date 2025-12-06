@@ -82,8 +82,8 @@ class FirebaseManager {
 
   FirebaseManager._internal();
 
-  void sendAutoRunToFirebase(bool isAuto) {
-    rootPath.child('cccdauto').set(isAuto);
+  Future<void> sendAutoRunToFirebase(bool isAuto) async {
+    await rootPath.child('cccdauto').set(isAuto);
   }
 
   // Phương thức để đặt lại connection khi key thay đổi

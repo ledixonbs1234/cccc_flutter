@@ -9,166 +9,92 @@ import '../../../managers/fireabaseManager.dart';
 class CccdErrorController extends GetxController {
   final errorCCCDList = <CCCDInfo>[].obs;
   final isExporting = false.obs;
+  final isLoading = false.obs;
   final totalCCCDList = <CCCDInfo>[].obs;
   final currentIndex = 0.obs;
-  final autoSyncEnabled = true.obs; // Auto sync setting
 
   @override
   void onInit() {
     super.onInit();
-    // Get error CCCD list and additional info from arguments if passed
-    if (Get.arguments != null && Get.arguments is Map<String, dynamic>) {
-      final args = Get.arguments as Map<String, dynamic>;
-      errorCCCDList.value = (args['errorList'] as List<CCCDInfo>?) ?? [];
-      totalCCCDList.value = (args['totalList'] as List<CCCDInfo>?) ?? [];
-      currentIndex.value = (args['currentIndex'] as int?) ?? 0;
-    } else if (Get.arguments != null && Get.arguments is List<CCCDInfo>) {
-      // Backward compatibility
-      errorCCCDList.value = Get.arguments as List<CCCDInfo>;
-    }
-
-    // Listen to changes in errorCCCDList and auto sync if enabled
-    ever(errorCCCDList, (_) {
-      if (autoSyncEnabled.value) {
-        _autoSyncToFirebase();
-      }
-    });
+    // Load error CCCD list from Firebase on initialization
+    loadErrorCCCDsFromFirebase();
   }
 
-  /// Sync all error CCCD data to Firebase Realtime Database
-  /// (Optimized for a single write operation)
-  Future<void> syncErrorCCCDsToFirebase() async {
-    if (errorCCCDList.isEmpty) {
-      Get.snackbar("Thông báo", "Không có dữ liệu lỗi để đồng bộ");
-      return;
-    }
+  /// Load all error CCCD data from Firebase Realtime Database
+  Future<void> loadErrorCCCDsFromFirebase() async {
+    isLoading.value = true;
 
     try {
-      // Chuẩn bị một Map để chứa tất cả các bản ghi lỗi.
-      // Các key của map này sẽ là các ID duy nhất được tạo bởi push().key.
-      Map<String, dynamic> recordsMap = {};
-      final recordsRef =
-          FirebaseManager().rootPath.child('errorcccd').child('records');
+      final snapshot =
+          await FirebaseManager().rootPath.child('errorcccd').get();
 
-      for (int i = 0; i < errorCCCDList.length; i++) {
-        CCCDInfo errorCCCD = errorCCCDList[i];
+      if (snapshot.exists && snapshot.value != null) {
+        Map<dynamic, dynamic> data = snapshot.value as Map<dynamic, dynamic>;
 
-        Map<String, dynamic> errorRecord =
-            Map<String, dynamic>.from(errorCCCD.toJsonFull());
-        errorRecord['errorIndex'] = i + 1;
-        errorRecord['errorTimestamp'] =
-            DateTime.now().millisecondsSinceEpoch.toString();
+        // Get metadata if exists
+        Map<dynamic, dynamic>? metadata =
+            data['metadata'] as Map<dynamic, dynamic>?;
+        Map<dynamic, dynamic>? records =
+            data['records'] as Map<dynamic, dynamic>?;
 
-        // Tạo một key duy nhất cho mỗi bản ghi mà không ghi dữ liệu
-        String? uniqueKey = recordsRef.push().key;
-        if (uniqueKey != null) {
-          recordsMap[uniqueKey] = errorRecord;
+        if (records != null) {
+          List<CCCDInfo> loadedList = [];
+
+          records.forEach((key, value) {
+            try {
+              Map<String, dynamic> recordMap =
+                  Map<String, dynamic>.from(value as Map);
+              // Create a new CCCDInfo instance and populate it using fromJson
+              CCCDInfo cccd = CCCDInfo('', '', '');
+              cccd.fromJson(recordMap);
+              cccd.firebaseKey = key; // Store the Firebase key
+              loadedList.add(cccd);
+            } catch (e) {
+              print('Error parsing CCCD record: $e');
+            }
+          });
+
+          // Sort by errorIndex if available (stored in recordMap)
+          loadedList.sort((a, b) {
+            return a.index.compareTo(b.index);
+          });
+
+          errorCCCDList.value = loadedList;
+
+          Get.snackbar(
+            "Thành công",
+            "Đã tải ${loadedList.length} bản ghi lỗi từ Firebase",
+            backgroundColor: Colors.green,
+            colorText: Colors.white,
+          );
+        } else {
+          errorCCCDList.clear();
+          Get.snackbar(
+            "Thông báo",
+            "Không có dữ liệu lỗi trên Firebase",
+            backgroundColor: Colors.grey,
+            colorText: Colors.white,
+          );
         }
+      } else {
+        errorCCCDList.clear();
+        Get.snackbar(
+          "Thông báo",
+          "Không có dữ liệu lỗi trên Firebase",
+          backgroundColor: Colors.grey,
+          colorText: Colors.white,
+        );
       }
-
-      // Chuẩn bị toàn bộ payload để ghi một lần
-      Map<String, dynamic> finalPayload = {
-        'metadata': {
-          'totalErrorRecords': errorCCCDList.length,
-          'syncTimestamp': DateTime.now().millisecondsSinceEpoch.toString(),
-          'syncDate': DateTime.now().toIso8601String(),
-        },
-        // Thêm tất cả các bản ghi lỗi đã chuẩn bị
-        'records': recordsMap,
-      };
-
-      // Thực hiện ghi toàn bộ dữ liệu lên node 'errorcccd' trong một thao tác duy nhất
-      await FirebaseManager().rootPath.child('errorcccd').set(finalPayload);
-
-      Get.snackbar(
-        "Thành công",
-        "Đã đồng bộ ${errorCCCDList.length} bản ghi lỗi lên Firebase",
-        backgroundColor: Colors.green,
-        colorText: Colors.white,
-      );
     } catch (e) {
       Get.snackbar(
         "Lỗi",
-        "Không thể đồng bộ dữ liệu lên Firebase: $e",
+        "Không thể tải dữ liệu từ Firebase: $e",
         backgroundColor: Colors.red,
         colorText: Colors.white,
       );
+    } finally {
+      isLoading.value = false;
     }
-  }
-
-  /// Auto sync error CCCDs to Firebase in background
-  Future<void> _autoSyncToFirebase() async {
-    if (errorCCCDList.isEmpty) {
-      // Clear Firebase data if local list is empty
-      try {
-        await FirebaseManager().rootPath.child('errorcccd').remove();
-      } catch (e) {
-        // Ignore errors when clearing empty data
-      }
-      return;
-    }
-
-    try {
-      // Prepare data for sync
-      Map<String, dynamic> recordsMap = {};
-      final recordsRef =
-          FirebaseManager().rootPath.child('errorcccd').child('records');
-
-      for (int i = 0; i < errorCCCDList.length; i++) {
-        CCCDInfo errorCCCD = errorCCCDList[i];
-
-        Map<String, dynamic> errorRecord =
-            Map<String, dynamic>.from(errorCCCD.toJsonFull());
-        errorRecord['errorIndex'] = i + 1;
-        errorRecord['errorTimestamp'] =
-            DateTime.now().millisecondsSinceEpoch.toString();
-
-        // Add position in total list if available
-        if (totalCCCDList.isNotEmpty) {
-          int position = getPositionInTotalList(errorCCCD);
-          if (position > 0) {
-            errorRecord['positionInTotalList'] = position;
-            errorRecord['totalListCount'] = getTotalCCCDCount();
-          }
-        }
-
-        // Create unique key for each record
-        String? uniqueKey = recordsRef.push().key;
-        if (uniqueKey != null) {
-          recordsMap[uniqueKey] = errorRecord;
-        }
-      }
-
-      // Prepare final payload
-      Map<String, dynamic> finalPayload = {
-        'metadata': {
-          'totalErrorRecords': errorCCCDList.length,
-          'syncTimestamp': DateTime.now().millisecondsSinceEpoch.toString(),
-          'syncDate': DateTime.now().toIso8601String(),
-          'autoSync': true,
-        },
-        'records': recordsMap,
-      };
-
-      // Sync to Firebase
-      await FirebaseManager().rootPath.child('errorcccd').set(finalPayload);
-    } catch (e) {
-      // Silent fail for auto sync to avoid interrupting user experience
-      print('Auto sync to Firebase failed: $e');
-    }
-  }
-
-  /// Toggle auto sync functionality
-  void toggleAutoSync() {
-    autoSyncEnabled.value = !autoSyncEnabled.value;
-    Get.snackbar(
-      "Thông báo",
-      autoSyncEnabled.value
-          ? "Đã bật tự động đồng bộ Firebase"
-          : "Đã tắt tự động đồng bộ Firebase",
-      backgroundColor: autoSyncEnabled.value ? Colors.green : Colors.orange,
-      colorText: Colors.white,
-    );
   }
 
   /// Copy all error CCCD data to clipboard (legacy method)
@@ -228,17 +154,18 @@ class CccdErrorController extends GetxController {
     }
   }
 
-  /// Remove a CCCD from error list
+  /// Remove a CCCD from error list (local only)
   void removeErrorCCCD(int index) {
     if (index >= 0 && index < errorCCCDList.length) {
       final removedCCCD = errorCCCDList[index];
       errorCCCDList.removeAt(index);
 
-      // Sync back to HomeController's error list
-      _syncBackToHomeController();
-
       Get.snackbar(
-          "Thông báo", "Đã xóa ${removedCCCD.Name} khỏi danh sách lỗi");
+        "Thông báo",
+        "Đã xóa ${removedCCCD.Name} khỏi danh sách lỗi (chỉ local)",
+        backgroundColor: Colors.orange,
+        colorText: Colors.white,
+      );
     }
   }
 
@@ -255,27 +182,7 @@ class CccdErrorController extends GetxController {
     return totalCCCDList.length;
   }
 
-  /// Sync error list changes back to HomeController
-  void _syncBackToHomeController() {
-    try {
-      // Try to get HomeController instance if it exists
-      if (Get.isRegistered<HomeController>()) {
-        final homeController = Get.find<HomeController>();
-
-        // Update HomeController's error list to match current list
-        homeController.errorCCCDList.clear();
-        homeController.errorCCCDList.addAll(errorCCCDList);
-
-        print(
-            'Synced ${errorCCCDList.length} error CCCDs back to HomeController');
-      }
-    } catch (e) {
-      print('Could not sync back to HomeController: $e');
-      // Non-critical error, app can continue
-    }
-  }
-
-  /// Clear all error CCCDs from local list and Firebase
+  /// Clear all error CCCDs from local list only (does not modify Firebase)
   void clearAllErrorCCCDs() {
     if (errorCCCDList.isEmpty) {
       Get.snackbar("Thông báo", "Danh sách lỗi đã trống");
@@ -286,46 +193,25 @@ class CccdErrorController extends GetxController {
       AlertDialog(
         title: const Text('Xác nhận'),
         content: Text(
-            'Bạn có chắc muốn xóa tất cả ${errorCCCDList.length} CCCD lỗi?\nDữ liệu sẽ được xóa cả trên thiết bị và Firebase.'),
+            'Bạn có chắc muốn xóa tất cả ${errorCCCDList.length} CCCD lỗi khỏi danh sách local?\n\nLưu ý: Dữ liệu trên Firebase sẽ không bị xóa. Bạn có thể tải lại bằng nút "Tải lại từ Firebase".'),
         actions: [
           TextButton(
             onPressed: () => Get.back(),
             child: const Text('Hủy'),
           ),
           TextButton(
-            onPressed: () async {
-              try {
-                // Clear from Firebase first
-                await FirebaseManager().rootPath.child('errorcccd').remove();
+            onPressed: () {
+              // Clear local list only
+              int count = errorCCCDList.length;
+              errorCCCDList.clear();
 
-                // Clear local list
-                errorCCCDList.clear();
-
-                // Sync back to HomeController's error list
-                _syncBackToHomeController();
-
-                Get.back();
-                Get.snackbar(
-                  "Thành công",
-                  "Đã xóa tất cả CCCD lỗi khỏi thiết bị và Firebase",
-                  backgroundColor: Colors.green,
-                  colorText: Colors.white,
-                );
-              } catch (e) {
-                // If Firebase fails, still clear local list
-                errorCCCDList.clear();
-
-                // Sync back to HomeController's error list
-                _syncBackToHomeController();
-
-                Get.back();
-                Get.snackbar(
-                  "Cảnh báo",
-                  "Đã xóa dữ liệu cục bộ nhưng có lỗi khi xóa Firebase: $e",
-                  backgroundColor: Colors.orange,
-                  colorText: Colors.white,
-                );
-              }
+              Get.back();
+              Get.snackbar(
+                "Thành công",
+                "Đã xóa $count CCCD lỗi khỏi danh sách local",
+                backgroundColor: Colors.green,
+                colorText: Colors.white,
+              );
             },
             child: const Text('Xóa'),
           ),
@@ -336,8 +222,6 @@ class CccdErrorController extends GetxController {
 
   @override
   void onClose() {
-    // Sync final state back to HomeController before closing
-    _syncBackToHomeController();
     super.onClose();
   }
 }

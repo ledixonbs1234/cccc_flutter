@@ -23,29 +23,50 @@ class CccdErrorView extends GetView<CccdErrorController> {
             Row(
               children: [
                 Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      controller.syncErrorCCCDsToFirebase();
-                    },
+                  child: Obx(() => ElevatedButton(
+                    onPressed: controller.isLoading.value 
+                        ? null 
+                        : () {
+                            controller.loadErrorCCCDsFromFirebase();
+                          },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blue,
                       foregroundColor: Colors.white,
                     ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.cloud_upload),
-                        SizedBox(width: 8.0),
-                        Flexible(
-                          child: Text(
-                            'Sync to Firebase',
-                            style: TextStyle(fontSize: 13),
-                            overflow: TextOverflow.ellipsis,
+                    child: controller.isLoading.value
+                        ? const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              SizedBox(width: 8.0),
+                              Text(
+                                'Đang tải...',
+                                style: TextStyle(fontSize: 13),
+                              ),
+                            ],
+                          )
+                        : const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.refresh),
+                              SizedBox(width: 8.0),
+                              Flexible(
+                                child: Text(
+                                  'Tải lại từ Firebase',
+                                  style: TextStyle(fontSize: 13),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  )),
                 ),
                 const SizedBox(width: 16.0),
                 Expanded(
@@ -105,45 +126,6 @@ class CccdErrorView extends GetView<CccdErrorController> {
                       ],
                     ),
                   ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 16.0),
-
-            // Auto Sync Toggle Row
-            Row(
-              children: [
-                Expanded(
-                  child: Obx(() => ElevatedButton(
-                    onPressed: () {
-                      controller.toggleAutoSync();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: controller.autoSyncEnabled.value 
-                          ? Colors.green
-                          : Colors.grey,
-                      foregroundColor: Colors.white,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(controller.autoSyncEnabled.value 
-                            ? Icons.sync 
-                            : Icons.sync_disabled),
-                        const SizedBox(width: 8.0),
-                        Flexible(
-                          child: Text(
-                            controller.autoSyncEnabled.value 
-                                ? 'Auto Sync: ON'
-                                : 'Auto Sync: OFF',
-                            style: const TextStyle(fontSize: 13),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  )),
                 ),
               ],
             ),
@@ -219,33 +201,6 @@ class CccdErrorView extends GetView<CccdErrorController> {
                           ],
                         ),
                       ],
-                      const SizedBox(height: 8.0),
-                      Row(
-                        children: [
-                          Icon(
-                            controller.autoSyncEnabled.value 
-                                ? Icons.sync 
-                                : Icons.sync_disabled,
-                            color: controller.autoSyncEnabled.value 
-                                ? Colors.green 
-                                : Colors.grey,
-                            size: 20.0,
-                          ),
-                          const SizedBox(width: 8.0),
-                          Text(
-                            'Auto Sync: ${controller.autoSyncEnabled.value ? "ON" : "OFF"}',
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
-                                ?.copyWith(
-                                  color: controller.autoSyncEnabled.value 
-                                      ? Colors.green.shade700
-                                      : Colors.grey.shade600,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                          ),
-                        ],
-                      ),
                     ],
                   ),
                 ),

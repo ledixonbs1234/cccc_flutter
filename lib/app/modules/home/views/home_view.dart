@@ -503,7 +503,7 @@ class HomeView extends GetView<HomeController> {
                         context,
                         Icons.numbers,
                         'Số lượng',
-                        '${controller.indexCurrent.value} / ${controller.totalCCCD.length}',
+                        controller.positionDisplay,
                         colorScheme,
                       ),
                       const SizedBox(height: 12),
@@ -519,11 +519,53 @@ class HomeView extends GetView<HomeController> {
                       const SizedBox(height: 12),
                       _buildStatusRow(
                         context,
+                        _getStatusIcon(controller.currentCCCD?.status),
+                        'Trạng thái CCCD',
+                        _getStatusText(controller.currentCCCD?.status),
+                        colorScheme,
+                        statusColor: _getStatusColor(
+                            controller.currentCCCD?.status, colorScheme),
+                      ),
+                      const SizedBox(height: 12),
+                      _buildStatusRow(
+                        context,
                         controller.isAutoRun.value
                             ? Icons.autorenew
                             : Icons.pause_circle,
                         'Chế độ',
                         controller.isAutoRun.value ? 'Tự động' : 'Thủ công',
+                        colorScheme,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildStatusRow(
+                        context,
+                        Icons.pending_actions,
+                        'Đang chờ',
+                        '${controller.pendingCount}',
+                        colorScheme,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildStatusRow(
+                        context,
+                        Icons.sync,
+                        'Đang xử lý',
+                        '${controller.processingCount}',
+                        colorScheme,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildStatusRow(
+                        context,
+                        Icons.check_circle,
+                        'Hoàn thành',
+                        '${controller.completedCount}',
+                        colorScheme,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildStatusRow(
+                        context,
+                        Icons.error,
+                        'Lỗi',
+                        '${controller.errorCount}',
                         colorScheme,
                       ),
                     ],
@@ -661,13 +703,16 @@ class HomeView extends GetView<HomeController> {
                         Icons.autorenew,
                         controller.isAutoRun.value,
                         (value) {
-                          controller.isAutoRun.value = value;
-                          if (controller.isAutoRun.value) {
-                            controller.processCCCD();
-                          } else {
+                          // ✅ CHỈ update Firebase, listener sẽ handle processing
+                          controller.sendAutoRunToFirebase(value);
+
+                          // ❌ KHÔNG gọi processCCCD() ở đây
+                          // Listener sẽ tự động trigger khi isAutoRun thay đổi
+
+                          // Stop sending nếu tắt auto
+                          if (!value) {
                             controller.isSending = false;
                           }
-                          controller.sendAutoRunToFirebase(value);
                         },
                         colorScheme,
                       ),
@@ -681,11 +726,20 @@ class HomeView extends GetView<HomeController> {
   }
 
   // Helper method to build status row
-  Widget _buildStatusRow(BuildContext context, IconData icon, String label,
-      String value, ColorScheme colorScheme) {
+  Widget _buildStatusRow(
+    BuildContext context,
+    IconData icon,
+    String label,
+    String value,
+    ColorScheme colorScheme, {
+    Color? statusColor,
+  }) {
+    final valueColor = statusColor ?? colorScheme.onSurface;
+    final iconColor = statusColor ?? colorScheme.onSurfaceVariant;
+
     return Row(
       children: [
-        Icon(icon, size: 20, color: colorScheme.onSurfaceVariant),
+        Icon(icon, size: 20, color: iconColor),
         const SizedBox(width: 12),
         Text(
           '$label:',
@@ -699,7 +753,7 @@ class HomeView extends GetView<HomeController> {
           child: Text(
             value,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurface,
+                  color: valueColor,
                   fontWeight: FontWeight.w600,
                 ),
             overflow: TextOverflow.ellipsis,
@@ -983,7 +1037,7 @@ class HomeView extends GetView<HomeController> {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            'Nhập để tìm kiếm trong ${controller.totalCCCD.length} CCCD',
+                            'Nhập để tìm kiếm trong ${controller.totalPosition} CCCD',
                             style:
                                 Theme.of(context).textTheme.bodySmall?.copyWith(
                                       color: colorScheme.onSurfaceVariant,
@@ -1044,7 +1098,7 @@ class HomeView extends GetView<HomeController> {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      'Danh sách CCCD đã quét (${controller.totalCCCD.length})',
+                      'Danh sách CCCD đã quét (${controller.totalPosition})',
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.w600,
                             color: colorScheme.onSurface,
@@ -1408,7 +1462,7 @@ class HomeView extends GetView<HomeController> {
                                         ),
                                   ),
                                 Text(
-                                  'Vị trí: $positionInMainList/${controller.totalCCCD.length}',
+                                  'Vị trí: $positionInMainList/${controller.totalPosition}',
                                   style: Theme.of(context)
                                       .textTheme
                                       .bodySmall
@@ -1579,5 +1633,53 @@ class HomeView extends GetView<HomeController> {
   // Helper method to format time
   String _formatTime(DateTime dateTime) {
     return '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}:${dateTime.second.toString().padLeft(2, '0')}';
+  }
+
+  // Helper method to get status icon
+  IconData _getStatusIcon(String? status) {
+    switch (status) {
+      case 'pending':
+        return Icons.pending_outlined;
+      case 'processing':
+        return Icons.sync;
+      case 'completed':
+        return Icons.check_circle_outline;
+      case 'error':
+        return Icons.error_outline;
+      default:
+        return Icons.help_outline;
+    }
+  }
+
+  // Helper method to get status text
+  String _getStatusText(String? status) {
+    switch (status) {
+      case 'pending':
+        return 'Đang chờ';
+      case 'processing':
+        return 'Đang xử lý';
+      case 'completed':
+        return 'Hoàn thành';
+      case 'error':
+        return 'Lỗi';
+      default:
+        return 'Không xác định';
+    }
+  }
+
+  // Helper method to get status color
+  Color _getStatusColor(String? status, ColorScheme colorScheme) {
+    switch (status) {
+      case 'pending':
+        return Colors.orange;
+      case 'processing':
+        return Colors.blue;
+      case 'completed':
+        return Colors.green;
+      case 'error':
+        return colorScheme.error;
+      default:
+        return colorScheme.onSurfaceVariant;
+    }
   }
 }
