@@ -112,7 +112,7 @@ class HomeView extends GetView<HomeController> {
                 ),
                 const SizedBox(width: 12),
                 Text(
-                  'Mã bưu gửi',
+                  'Mã bưu gửi của hộp CCCD',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                         color: colorScheme.onSurface,
@@ -364,23 +364,23 @@ class HomeView extends GetView<HomeController> {
             const SizedBox(height: 16),
             Row(
               children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      controller.testCapture();
-                    },
-                    icon: const Icon(Icons.science),
-                    label: const Text('Test Capture'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: colorScheme.tertiary,
-                      side: BorderSide(color: colorScheme.tertiary),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                  ),
-                ),
+                // Expanded(
+                //   child: OutlinedButton.icon(
+                //     onPressed: () {
+                //       controller.testCapture();
+                //     },
+                //     icon: const Icon(Icons.science),
+                //     label: const Text('Test Capture'),
+                //     style: OutlinedButton.styleFrom(
+                //       foregroundColor: colorScheme.tertiary,
+                //       side: BorderSide(color: colorScheme.tertiary),
+                //       padding: const EdgeInsets.symmetric(vertical: 16),
+                //       shape: RoundedRectangleBorder(
+                //         borderRadius: BorderRadius.circular(12),
+                //       ),
+                //     ),
+                //   ),
+                // ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: OutlinedButton.icon(
