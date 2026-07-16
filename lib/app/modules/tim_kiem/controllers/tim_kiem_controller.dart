@@ -222,7 +222,7 @@ class TimKiemController extends GetxController {
 
       // Start date: 1st of selected month
       final ngayBatDau =
-          _formatDateForWeb(DateTime(currentYear, searchMonth, 1));
+          _formatDateForWeb(DateTime(currentYear, searchMonth - 3, 1));
 
       // End date: last day of month + 2 months OR current date (if selected month is current month)
       DateTime endDate;
